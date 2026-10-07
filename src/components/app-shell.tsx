@@ -56,7 +56,7 @@ export function LogoMark({ className }: { className?: string }) {
 
 export function Logo({
   withName = false,
-  markClassName = "size-9",
+  markClassName = "size-7",
 }: {
   withName?: boolean;
   markClassName?: string;
@@ -64,7 +64,7 @@ export function Logo({
   return (
     <Link
       to="/"
-      className="inline-flex items-center gap-2.5 rounded-xl font-semibold tracking-tight focus-visible:ring-3 focus-visible:ring-ring/30 focus-visible:outline-none"
+      className="inline-flex items-center gap-2 rounded-lg text-[15px] font-semibold tracking-tight focus-visible:ring-3 focus-visible:ring-ring/30 focus-visible:outline-none"
     >
       <LogoMark className={markClassName} />
       <span className={cn(!withName && "sr-only")}>{APP_NAME}</span>
@@ -212,7 +212,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {/* Phones: top bar, then a scrolling row of nav pills. */}
       <div className="md:hidden">
         <header className="flex h-16 items-center justify-between gap-3 px-5 sm:px-8">
-          <Logo withName markClassName="size-8" />
+          <Logo withName />
           <div className="flex items-center gap-2">
             <ThemeToggle />
             <UserMenu user={user} compact />
@@ -226,7 +226,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {/* Wider screens: a full-height sidebar. Logo, nav icons, and account share one edge. */}
       <aside className="sticky top-0 hidden h-svh flex-col gap-6 py-8 md:flex">
         <div className="flex h-9 items-center px-3">
-          <Logo withName markClassName="size-7" />
+          <Logo withName />
         </div>
         <nav aria-label="Main" className="flex flex-col gap-0.5">
           {nav}
