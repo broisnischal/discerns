@@ -1,8 +1,8 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { LoaderCircleIcon } from "lucide-react";
 import { useEffect } from "react";
 
+import { LoaderCircleIcon } from "#/components/icons.ts";
 import { Button } from "#/components/ui/button.tsx";
 import { $acceptInvite } from "#/lib/items/functions.ts";
 import { itemKeys } from "#/lib/items/queries.ts";

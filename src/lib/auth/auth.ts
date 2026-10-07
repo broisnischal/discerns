@@ -2,6 +2,7 @@ import "@tanstack/react-start/server-only";
 import { betterAuth } from "better-auth/minimal";
 
 import { authOptions } from "#/lib/auth/options.ts";
+import { applySubscriptionEvent, checkoutDiscounts } from "#/lib/billing/billing.server.ts";
 import { db } from "#/lib/db/index.ts";
 import * as schema from "#/lib/db/schema/index.ts";
 import { serverEnv } from "#/lib/env.server.ts";
@@ -17,6 +18,23 @@ function createAuth() {
       schema,
       github: { clientId: env.GITHUB_CLIENT_ID, clientSecret: env.GITHUB_CLIENT_SECRET },
       google: { clientId: env.GOOGLE_CLIENT_ID, clientSecret: env.GOOGLE_CLIENT_SECRET },
+      billing:
+        env.DODO_PAYMENTS_API_KEY &&
+        env.DODO_PAYMENTS_WEBHOOK_SECRET &&
+        env.DODO_PRO_MONTHLY_PRODUCT_ID
+          ? {
+              apiKey: env.DODO_PAYMENTS_API_KEY,
+              webhookSecret: env.DODO_PAYMENTS_WEBHOOK_SECRET,
+              environment:
+                env.DODO_PAYMENTS_ENVIRONMENT === "live_mode" ? "live_mode" : "test_mode",
+              proProductIds: {
+                monthly: env.DODO_PRO_MONTHLY_PRODUCT_ID,
+                yearly: env.DODO_PRO_YEARLY_PRODUCT_ID || undefined,
+              },
+              checkoutDiscounts,
+              onSubscription: applySubscriptionEvent,
+            }
+          : undefined,
     }),
     databaseHooks: {
       user: {

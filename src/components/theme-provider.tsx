@@ -29,6 +29,10 @@ const ThemeProviderContext = createContext<ThemeProviderState>({
 
 function applyTheme(theme: Theme) {
   const root = document.documentElement;
+  // Every color transition would fire at once and smear the switch; freeze them for a frame.
+  const freeze = document.createElement("style");
+  freeze.textContent = "*,*::before,*::after{transition:none !important}";
+  document.head.appendChild(freeze);
   root.classList.remove("light", "dark");
 
   const resolved =
@@ -40,6 +44,8 @@ function applyTheme(theme: Theme) {
 
   root.classList.add(resolved);
   root.style.colorScheme = resolved;
+  void root.offsetHeight; // force a reflow so the frozen styles apply before the swap
+  requestAnimationFrame(() => freeze.remove());
 }
 
 export function ThemeProvider({

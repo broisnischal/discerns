@@ -15,5 +15,14 @@ export function serverEnv() {
     GITHUB_CLIENT_SECRET: env.GITHUB_CLIENT_SECRET,
     GOOGLE_CLIENT_ID: env.GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET: env.GOOGLE_CLIENT_SECRET,
+    DODO_PAYMENTS_API_KEY: env.DODO_PAYMENTS_API_KEY,
+    DODO_PAYMENTS_WEBHOOK_SECRET: env.DODO_PAYMENTS_WEBHOOK_SECRET,
+    /** "test_mode" or "live_mode". */
+    DODO_PAYMENTS_ENVIRONMENT: env.DODO_PAYMENTS_ENVIRONMENT,
+    /** The Pro subscription products in Dodo, one per billing interval. */
+    DODO_PRO_MONTHLY_PRODUCT_ID: env.DODO_PRO_MONTHLY_PRODUCT_ID,
+    DODO_PRO_YEARLY_PRODUCT_ID: env.DODO_PRO_YEARLY_PRODUCT_ID,
+    /** Dodo discount code for the first-month intro price; optional. */
+    DODO_INTRO_DISCOUNT_CODE: env.DODO_INTRO_DISCOUNT_CODE,
   };
 }

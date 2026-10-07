@@ -6,5 +6,5 @@ import { createLoggerStorage } from "evlog/toolkit/storage";
  */
 export const { storage: loggerStorage, useLogger } = createLoggerStorage(
   "request. src/server.ts must wrap the TanStack handler with withEvlog().",
-  "ewiz-share:workers",
+  "discerns:workers",
 );

@@ -1,6 +1,6 @@
-import { CheckIcon, CopyIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { CheckIcon, CopyIcon } from "#/components/icons.ts";
 import { Button } from "#/components/ui/button.tsx";
 
 export function CopyButton({

@@ -19,7 +19,11 @@ import { Route as PIdRouteImport } from './routes/p/$id'
 import { Route as RawIdRouteImport } from './routes/raw/$id'
 import { Route as AuthAppIndexRouteImport } from './routes/_auth/app/index'
 import { Route as AuthAppConnectRouteImport } from './routes/_auth/app/connect'
+import { Route as AuthAppItemsRouteImport } from './routes/_auth/app/items'
 import { Route as AuthAppNewRouteImport } from './routes/_auth/app/new'
+import { Route as AuthAppPeopleRouteImport } from './routes/_auth/app/people'
+import { Route as AuthAppProjectsRouteImport } from './routes/_auth/app/projects'
+import { Route as AuthAppSettingsRouteImport } from './routes/_auth/app/settings'
 import { Route as AuthInviteTokenRouteImport } from './routes/_auth/invite/$token'
 import { Route as AuthOauthConsentRouteImport } from './routes/_auth/oauth/consent'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
@@ -73,9 +77,29 @@ const AuthAppConnectRoute = AuthAppConnectRouteImport.update({
   path: '/app/connect',
   getParentRoute: () => AuthRouteRoute,
 } as any)
+const AuthAppItemsRoute = AuthAppItemsRouteImport.update({
+  id: '/app/items',
+  path: '/app/items',
+  getParentRoute: () => AuthRouteRoute,
+} as any)
 const AuthAppNewRoute = AuthAppNewRouteImport.update({
   id: '/app/new',
   path: '/app/new',
+  getParentRoute: () => AuthRouteRoute,
+} as any)
+const AuthAppPeopleRoute = AuthAppPeopleRouteImport.update({
+  id: '/app/people',
+  path: '/app/people',
+  getParentRoute: () => AuthRouteRoute,
+} as any)
+const AuthAppProjectsRoute = AuthAppProjectsRouteImport.update({
+  id: '/app/projects',
+  path: '/app/projects',
+  getParentRoute: () => AuthRouteRoute,
+} as any)
+const AuthAppSettingsRoute = AuthAppSettingsRouteImport.update({
+  id: '/app/settings',
+  path: '/app/settings',
   getParentRoute: () => AuthRouteRoute,
 } as any)
 const AuthInviteTokenRoute = AuthInviteTokenRouteImport.update({
@@ -107,7 +131,11 @@ export interface FileRoutesByFullPath {
   '/p/$id': typeof PIdRoute
   '/raw/$id': typeof RawIdRoute
   '/app/connect': typeof AuthAppConnectRoute
+  '/app/items': typeof AuthAppItemsRoute
   '/app/new': typeof AuthAppNewRoute
+  '/app/people': typeof AuthAppPeopleRoute
+  '/app/projects': typeof AuthAppProjectsRoute
+  '/app/settings': typeof AuthAppSettingsRoute
   '/invite/$token': typeof AuthInviteTokenRoute
   '/oauth/consent': typeof AuthOauthConsentRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -122,7 +150,11 @@ export interface FileRoutesByTo {
   '/p/$id': typeof PIdRoute
   '/raw/$id': typeof RawIdRoute
   '/app/connect': typeof AuthAppConnectRoute
+  '/app/items': typeof AuthAppItemsRoute
   '/app/new': typeof AuthAppNewRoute
+  '/app/people': typeof AuthAppPeopleRoute
+  '/app/projects': typeof AuthAppProjectsRoute
+  '/app/settings': typeof AuthAppSettingsRoute
   '/invite/$token': typeof AuthInviteTokenRoute
   '/oauth/consent': typeof AuthOauthConsentRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -140,7 +172,11 @@ export interface FileRoutesById {
   '/p/$id': typeof PIdRoute
   '/raw/$id': typeof RawIdRoute
   '/_auth/app/connect': typeof AuthAppConnectRoute
+  '/_auth/app/items': typeof AuthAppItemsRoute
   '/_auth/app/new': typeof AuthAppNewRoute
+  '/_auth/app/people': typeof AuthAppPeopleRoute
+  '/_auth/app/projects': typeof AuthAppProjectsRoute
+  '/_auth/app/settings': typeof AuthAppSettingsRoute
   '/_auth/invite/$token': typeof AuthInviteTokenRoute
   '/_auth/oauth/consent': typeof AuthOauthConsentRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -157,7 +193,11 @@ export interface FileRouteTypes {
     | '/p/$id'
     | '/raw/$id'
     | '/app/connect'
+    | '/app/items'
     | '/app/new'
+    | '/app/people'
+    | '/app/projects'
+    | '/app/settings'
     | '/invite/$token'
     | '/oauth/consent'
     | '/api/auth/$'
@@ -172,7 +212,11 @@ export interface FileRouteTypes {
     | '/p/$id'
     | '/raw/$id'
     | '/app/connect'
+    | '/app/items'
     | '/app/new'
+    | '/app/people'
+    | '/app/projects'
+    | '/app/settings'
     | '/invite/$token'
     | '/oauth/consent'
     | '/api/auth/$'
@@ -189,7 +233,11 @@ export interface FileRouteTypes {
     | '/p/$id'
     | '/raw/$id'
     | '/_auth/app/connect'
+    | '/_auth/app/items'
     | '/_auth/app/new'
+    | '/_auth/app/people'
+    | '/_auth/app/projects'
+    | '/_auth/app/settings'
     | '/_auth/invite/$token'
     | '/_auth/oauth/consent'
     | '/api/auth/$'
@@ -280,11 +328,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthAppConnectRouteImport
       parentRoute: typeof AuthRouteRoute
     }
+    '/_auth/app/items': {
+      id: '/_auth/app/items'
+      path: '/app/items'
+      fullPath: '/app/items'
+      preLoaderRoute: typeof AuthAppItemsRouteImport
+      parentRoute: typeof AuthRouteRoute
+    }
     '/_auth/app/new': {
       id: '/_auth/app/new'
       path: '/app/new'
       fullPath: '/app/new'
       preLoaderRoute: typeof AuthAppNewRouteImport
+      parentRoute: typeof AuthRouteRoute
+    }
+    '/_auth/app/people': {
+      id: '/_auth/app/people'
+      path: '/app/people'
+      fullPath: '/app/people'
+      preLoaderRoute: typeof AuthAppPeopleRouteImport
+      parentRoute: typeof AuthRouteRoute
+    }
+    '/_auth/app/projects': {
+      id: '/_auth/app/projects'
+      path: '/app/projects'
+      fullPath: '/app/projects'
+      preLoaderRoute: typeof AuthAppProjectsRouteImport
+      parentRoute: typeof AuthRouteRoute
+    }
+    '/_auth/app/settings': {
+      id: '/_auth/app/settings'
+      path: '/app/settings'
+      fullPath: '/app/settings'
+      preLoaderRoute: typeof AuthAppSettingsRouteImport
       parentRoute: typeof AuthRouteRoute
     }
     '/_auth/invite/$token': {
@@ -320,7 +396,11 @@ declare module '@tanstack/react-router' {
 
 interface AuthRouteRouteChildren {
   AuthAppConnectRoute: typeof AuthAppConnectRoute
+  AuthAppItemsRoute: typeof AuthAppItemsRoute
   AuthAppNewRoute: typeof AuthAppNewRoute
+  AuthAppPeopleRoute: typeof AuthAppPeopleRoute
+  AuthAppProjectsRoute: typeof AuthAppProjectsRoute
+  AuthAppSettingsRoute: typeof AuthAppSettingsRoute
   AuthInviteTokenRoute: typeof AuthInviteTokenRoute
   AuthOauthConsentRoute: typeof AuthOauthConsentRoute
   AuthAppIndexRoute: typeof AuthAppIndexRoute
@@ -329,7 +409,11 @@ interface AuthRouteRouteChildren {
 
 const AuthRouteRouteChildren: AuthRouteRouteChildren = {
   AuthAppConnectRoute: AuthAppConnectRoute,
+  AuthAppItemsRoute: AuthAppItemsRoute,
   AuthAppNewRoute: AuthAppNewRoute,
+  AuthAppPeopleRoute: AuthAppPeopleRoute,
+  AuthAppProjectsRoute: AuthAppProjectsRoute,
+  AuthAppSettingsRoute: AuthAppSettingsRoute,
   AuthInviteTokenRoute: AuthInviteTokenRoute,
   AuthOauthConsentRoute: AuthOauthConsentRoute,
   AuthAppIndexRoute: AuthAppIndexRoute,

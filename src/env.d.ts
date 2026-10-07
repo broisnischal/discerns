@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
-  /** Public origin, e.g. https://share.ewiz.app. Set in .env.development / .env.production. */
+  /** Public origin, e.g. https://discerns.app. Set in .env.development / .env.production. */
   readonly VITE_BASE_URL: string;
 }
 

@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BotIcon, HistoryIcon, LoaderCircleIcon, MonitorIcon } from "lucide-react";
 import { useState } from "react";
 
+import { BotIcon, HistoryIcon, LoaderCircleIcon, MonitorIcon } from "#/components/icons.ts";
 import { Button } from "#/components/ui/button.tsx";
 import {
   Dialog,
@@ -30,7 +30,7 @@ export function HistoryPanel({ item }: { item: ItemDetail }) {
 
   return (
     <>
-      <ol className="divide-y rounded-xl border">
+      <ol className="divide-y overflow-hidden surface">
         {versions.data.map((version) => {
           const SourceIcon = version.source === "mcp" ? BotIcon : MonitorIcon;
           return (
@@ -38,7 +38,7 @@ export function HistoryPanel({ item }: { item: ItemDetail }) {
               <button
                 type="button"
                 onClick={() => setSelected(version.version)}
-                className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none"
+                className="flex w-full items-center gap-3 px-4 py-3 text-start text-sm transition-colors duration-150 hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none"
               >
                 <span className="w-10 shrink-0 font-mono text-xs text-muted-foreground tabular-nums">
                   v{version.version}
@@ -47,9 +47,12 @@ export function HistoryPanel({ item }: { item: ItemDetail }) {
                 <span className="hidden items-center gap-1.5 text-xs text-muted-foreground sm:inline-flex">
                   <SourceIcon className="size-3.5" aria-hidden="true" />
                   {version.authorName ?? "Deleted user"}
-                  {version.source === "mcp" && " via Claude"}
+                  {version.source === "mcp" && " via an agent"}
                 </span>
-                <span className="w-24 shrink-0 text-right text-xs text-muted-foreground tabular-nums">
+                <span
+                  className="w-24 shrink-0 text-end text-xs text-muted-foreground tabular-nums"
+                  suppressHydrationWarning
+                >
                   {timeAgo(version.createdAt)}
                 </span>
               </button>
@@ -100,7 +103,7 @@ function VersionDialog({
             {query.data ? `Saved ${timeAgo(query.data.createdAt)}` : "Loading"}
           </DialogDescription>
         </DialogHeader>
-        <pre className="max-h-[60svh] overflow-auto rounded-xl bg-muted p-4 font-mono text-sm break-words whitespace-pre-wrap">
+        <pre className="max-h-[60svh] overflow-auto rounded-2xl bg-muted p-4 font-mono text-sm break-words whitespace-pre-wrap">
           {query.data?.content}
         </pre>
         {canRestore && (

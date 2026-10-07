@@ -1,9 +1,10 @@
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { z } from "zod";
 
-import { Logo } from "#/components/app-header.tsx";
+import { LogoMark } from "#/components/app-shell.tsx";
 import { authQueryOptions } from "#/lib/auth/queries.ts";
 import { safeRedirect } from "#/lib/format.ts";
+import { APP_NAME } from "#/lib/site.ts";
 
 export const Route = createFileRoute("/_guest")({
   // Loose so the signed OAuth query survives when an MCP client sends people here to sign in.
@@ -29,11 +30,14 @@ export const Route = createFileRoute("/_guest")({
 
 function GuestLayout() {
   return (
-    <div className="flex min-h-svh flex-col items-center justify-center gap-8 bg-background p-6 md:p-10">
-      <Logo />
+    <main className="flex min-h-svh flex-col items-center justify-center gap-8 p-6 md:p-10">
+      <div className="flex flex-col items-center gap-3">
+        <LogoMark className="size-14" />
+        <span className="font-semibold tracking-tight">{APP_NAME}</span>
+      </div>
       <div className="w-full max-w-sm">
         <Outlet />
       </div>
-    </div>
+    </main>
   );
 }

@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 
 import { getAuth } from "#/lib/auth/auth.ts";
 import { MCP_SCOPES } from "#/lib/auth/options.ts";
+import { getPlan } from "#/lib/billing/billing.server.ts";
 import { mcpHandler, toAuthInfo } from "#/lib/mcp/server.server.ts";
 
 const resource = `${import.meta.env.VITE_BASE_URL}/mcp`;
@@ -15,7 +16,11 @@ const resource = `${import.meta.env.VITE_BASE_URL}/mcp`;
 const handle = (request: Request) =>
   requireMcpAuth(
     getAuth(),
-    (req, claims) => mcpHandler.fetch(req, { authInfo: toAuthInfo(req, claims, resource) }),
+    async (req, claims) => {
+      // One primary-key read per request; agent access is what Pro pays for.
+      const plan = claims.sub ? await getPlan(claims.sub) : "free";
+      return mcpHandler.fetch(req, { authInfo: toAuthInfo(req, claims, resource, plan) });
+    },
     { resource, requiredScopes: MCP_SCOPES },
   )(request);
 

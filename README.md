@@ -1,8 +1,8 @@
-# ewiz share
+# discerns
 
 A private pastebin for prompts, memories, snippets, and `.env` files that I can share with collaborators and that Claude can read and write over MCP.
 
-Live at **https://share.ewiz.app**.
+Live at **https://discerns.app**.
 
 - Sign in with GitHub or Google.
 - Every item is private until I share it. I add people by email as viewers or editors. People without an account get an invite link and gain access when they sign in.
@@ -16,18 +16,18 @@ Live at **https://share.ewiz.app**.
 
 ```sh
 /plugin marketplace add <owner>/<repo>
-/plugin install ewiz-share@ewiz
+/plugin install discerns@discerns
 ```
 
 **Claude Code**, server only:
 
 ```sh
-claude mcp add --transport http ewiz-share https://share.ewiz.app/mcp
+claude mcp add --transport http discerns https://discerns.app/mcp
 ```
 
 Then run `/mcp` and sign in.
 
-**claude.ai, Desktop, mobile:** Settings → Connectors → Add custom connector → `https://share.ewiz.app/mcp`. The skill can be uploaded separately from Settings → Capabilities → Skills using [`ewiz-share-skill.zip`](https://share.ewiz.app/downloads/ewiz-share-skill.zip).
+**claude.ai, Desktop, mobile:** Settings → Connectors → Add custom connector → `https://discerns.app/mcp`. The skill can be uploaded separately from Settings → Capabilities → Skills using [`discerns-skill.zip`](https://discerns.app/downloads/discerns-skill.zip).
 
 ### MCP tools
 
@@ -43,7 +43,7 @@ Then run `/mcp` and sign in.
 | `delete_item`                      | Owner only                                                            |
 | `whoami`                           | The account the tools act as                                          |
 
-Items are also exposed as resources at `ewiz://items/{id}`.
+Items are also exposed as resources at `discerns://items/{id}`.
 
 ## Stack
 
@@ -67,7 +67,7 @@ src/lib/auth/options.ts           Better Auth config (providers, MCP OAuth serve
 src/routes/mcp.ts                 /mcp, token verification
 src/routes/[.]well-known/$.ts     OAuth discovery metadata
 src/server.ts                     Worker entry, request logging
-plugins/ewiz-share/               Claude plugin: skill + MCP server config
+plugins/discerns/               Claude plugin: skill + MCP server config
 .claude-plugin/marketplace.json   plugin marketplace
 ```
 
@@ -124,7 +124,7 @@ pnpm exec wrangler secret put GOOGLE_CLIENT_ID
 pnpm exec wrangler secret put GOOGLE_CLIENT_SECRET
 ```
 
-OAuth callbacks in production: `https://share.ewiz.app/api/auth/callback/github` and `https://share.ewiz.app/api/auth/callback/google`.
+OAuth callbacks in production: `https://discerns.app/api/auth/callback/github` and `https://discerns.app/api/auth/callback/google`.
 
 Then:
 
@@ -133,4 +133,4 @@ vpr db:migrate:remote
 vpr deploy
 ```
 
-`wrangler.jsonc` binds the D1 database `ewiz-share` and attaches the Worker to the `share.ewiz.app` custom domain.
+`wrangler.jsonc` binds the D1 database `discerns` and attaches the Worker to the `discerns.app` custom domain.

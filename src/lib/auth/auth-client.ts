@@ -1,4 +1,5 @@
 import { oauthProviderClient } from "@better-auth/oauth-provider/client";
+import { dodopaymentsClient } from "@dodopayments/better-auth/client";
 import { createAuthClient } from "better-auth/react";
 
 /**
@@ -10,9 +11,9 @@ import { createAuthClient } from "better-auth/react";
  * For server/SSR operations, prefer `auth.api` instead, and wrap in a serverFn if needed.
  *
  * oauthProviderClient carries the signed OAuth query through sign-in and consent,
- * so a Claude connector's authorization resumes after the user signs in.
+ * so an agent's MCP authorization resumes after the user signs in.
  */
 export const authClient = createAuthClient({
   baseURL: import.meta.env.VITE_BASE_URL,
-  plugins: [oauthProviderClient()],
+  plugins: [oauthProviderClient(), dodopaymentsClient()],
 });

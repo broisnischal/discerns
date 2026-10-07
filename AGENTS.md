@@ -3,9 +3,9 @@
 ## Essentials
 
 - Stack: TypeScript + React (TanStack Start) on Cloudflare Workers, with Drizzle ORM on D1, shadcn/ui, and Better Auth (GitHub/Google sign-in plus the OAuth server for MCP).
-- The product: a private pastebin with collaborators (`src/lib/items/*`), a remote MCP server at `/mcp` (`src/lib/mcp/server.server.ts`), and a Claude plugin with a skill in `plugins/ewiz-share/`. The website and the MCP tools both go through `src/lib/items/service.server.ts`; put new item behavior there, not in a route or a tool.
+- The product: a private pastebin with collaborators (`src/lib/items/*`), a remote MCP server at `/mcp` (`src/lib/mcp/server.server.ts`), and a Claude plugin with a skill in `plugins/discerns/`. The website and the MCP tools both go through `src/lib/items/service.server.ts`; put new item behavior there, not in a route or a tool.
 - Use shadcn CLI (`vpr ui add <component>`) for adding new UI components & primitives.
-- Use `lucide-react` for UI icons (use `Icon` suffix, e.g. `import { Loader2Icon } from "lucide-react"`); for brand icons use `@icons-pack/react-simple-icons` (e.g. `SiGithub`).
+- App icons come from `src/components/icons.ts` (Heroicons 20px solid re-exported under descriptive `*Icon` names); add new icons there rather than importing an icon package in a component. shadcn primitives in `src/components/ui` keep their bundled `lucide-react` glyphs. For brand icons use `@icons-pack/react-simple-icons` (e.g. `SiGithub`).
 - Keep UI copy user-centered: describe outcomes and next actions concisely without exposing providers, internal states, or implementation details.
 - Don't run a standalone build after every little change. Use `vpr lint` as the baseline and run the narrowest relevant tests described in the testing guidelines; `vpr test:e2e` performs its own production build.
 - For running scripts, use `vpr`, which is a shorthand for `vp run`.

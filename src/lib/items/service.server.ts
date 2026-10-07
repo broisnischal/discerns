@@ -1,28 +1,51 @@
 import "@tanstack/react-start/server-only";
-import { and, desc, eq, exists, like, or, sql, type SQL } from "drizzle-orm";
+import { and, desc, eq, exists, isNull, like, or, sql, type SQL } from "drizzle-orm";
 import { createError } from "evlog";
 
+import { assertCanCreateItem, assertCanCreateProject } from "#/lib/billing/billing.server.ts";
 import { decrypt, encrypt } from "#/lib/crypto.server.ts";
 import { db } from "#/lib/db/index.ts";
-import { item, itemInvite, itemMember, itemVersion, user } from "#/lib/db/schema/index.ts";
+import {
+  item,
+  itemInvite,
+  itemMember,
+  itemVersion,
+  logEntry,
+  project,
+  projectMember,
+  user,
+} from "#/lib/db/schema/index.ts";
 import type { ChangeSource, MemberRole } from "#/lib/db/schema/types.ts";
 import { serverEnv } from "#/lib/env.server.ts";
 import {
   allowedVisibility,
   canEdit,
   canManage,
+  projectKey,
   resolveAccess,
   type Access,
 } from "#/lib/items/access.ts";
 import {
+  appendLogSchema,
   itemInputSchema,
   itemPatchSchema,
   listItemsSchema,
+  MAX_LOG_BYTES,
+  MAX_LOG_ENTRIES,
+  projectInputSchema,
+  projectPatchSchema,
   shareItemSchema,
+  shareProjectSchema,
+  tailLogSchema,
+  type AppendLogInput,
   type ItemInput,
   type ItemPatch,
   type ListItemsInput,
+  type ProjectInput,
+  type ProjectPatch,
   type ShareItemInput,
+  type ShareProjectInput,
+  type TailLogInput,
 } from "#/lib/items/schemas.ts";
 
 export interface Actor {
@@ -66,36 +89,127 @@ async function loadItem(id: string, userId: string | null) {
     .select({
       item,
       memberRole: itemMember.role,
+      projectRole: projectMember.role,
+      project: { id: project.id, name: project.name, key: project.key },
       owner: { id: user.id, name: user.name, email: user.email, image: user.image },
     })
     .from(item)
     .innerJoin(user, eq(user.id, item.ownerId))
     .leftJoin(itemMember, and(eq(itemMember.itemId, item.id), eq(itemMember.userId, userId ?? "")))
+    .leftJoin(project, eq(project.id, item.projectId))
+    .leftJoin(
+      projectMember,
+      and(eq(projectMember.projectId, item.projectId), eq(projectMember.userId, userId ?? "")),
+    )
     .where(eq(item.id, id))
     .get();
 
   if (!row) throw notFound();
   const access = resolveAccess(
-    { ownerId: row.item.ownerId, visibility: row.item.visibility, memberRole: row.memberRole },
+    {
+      ownerId: row.item.ownerId,
+      visibility: row.item.visibility,
+      memberRole: row.memberRole,
+      projectRole: row.projectRole,
+    },
     userId,
   );
   if (!access) throw notFound();
-  return { ...row, access };
+  return { ...row, project: row.project?.id ? row.project : null, access };
+}
+
+/** Projects the user owns or belongs to, with their role on each. */
+function accessibleProjects(userId: string) {
+  return db
+    .select({
+      id: project.id,
+      name: project.name,
+      key: project.key,
+      ownerId: project.ownerId,
+      createdAt: project.createdAt,
+      updatedAt: project.updatedAt,
+      memberRole: projectMember.role,
+      ownerName: user.name,
+      ownerEmail: user.email,
+      itemCount: sql<number>`(select count(*) from ${item} where ${item.projectId} = ${project.id})`,
+    })
+    .from(project)
+    .innerJoin(user, eq(user.id, project.ownerId))
+    .leftJoin(
+      projectMember,
+      and(eq(projectMember.projectId, project.id), eq(projectMember.userId, userId)),
+    )
+    .where(or(eq(project.ownerId, userId), sql`${projectMember.userId} is not null`));
+}
+
+type ProjectRow = Awaited<ReturnType<typeof accessibleProjects>>[number];
+
+const withProjectAccess = (row: ProjectRow, userId: string) => ({
+  ...row,
+  access: (row.ownerId === userId ? "owner" : row.memberRole) as "owner" | MemberRole,
+});
+
+/**
+ * Finds one of the user's projects by id, key, git remote URL, or name. Agents pass
+ * whatever it has for the repo it is working in, so all of those must work.
+ */
+async function resolveProject(userId: string, ref: string) {
+  const key = projectKey(ref);
+  const name = ref.trim().toLowerCase();
+  const rows = await accessibleProjects(userId);
+  const match =
+    rows.find((p) => p.id === ref.trim()) ??
+    rows.find((p) => p.key === key) ??
+    rows.find((p) => p.name.toLowerCase() === name);
+  if (!match) {
+    throw createError({
+      message: "Project not found",
+      status: 404,
+      why: `No project matches "${ref}"`,
+      fix: "Call list_projects to see them, or create_project to start one",
+    });
+  }
+  return withProjectAccess(match, userId);
+}
+
+/** A project the actor may file items into: owners and editors only. */
+async function projectForWriting(userId: string, ref: string) {
+  const found = await resolveProject(userId, ref);
+  if (!canEdit(found.access))
+    throw forbidden("Only project owners and editors can add items to it");
+  return found;
+}
+
+/** Untitled saves get a title from their first meaningful line, or from kind and date. */
+function deriveTitle(kind: string, content: string) {
+  const line = content
+    .split("\n")
+    .map((l) => l.replace(/^[#>*\-\s`]+/, "").trim())
+    .find((l) => l.length > 0 && !/^[A-Z0-9_]+=/.test(l));
+  if (line) return line.length > 80 ? `${line.slice(0, 77).trimEnd()}…` : line;
+  const label = kind.charAt(0).toUpperCase() + kind.slice(1);
+  return `${label} · ${new Date().toISOString().slice(0, 10)}`;
 }
 
 export async function createItem(actor: Actor, input: ItemInput) {
   const data = itemInputSchema.parse(input);
+  await assertCanCreateItem(actor.userId);
   const id = newId();
   const encrypted = data.kind === "env";
-  const content = await sealContent(data.content, encrypted);
+  const isLog = data.kind === "log";
+  const projectId = data.project ? (await projectForWriting(actor.userId, data.project)).id : null;
+  const title = data.title || deriveTitle(data.kind, data.content);
+  // A log's text lives in log_entry rows; the item row only carries its metadata.
+  const content = isLog ? "" : await sealContent(data.content, encrypted);
   const visibility = allowedVisibility(data.kind, data.visibility);
 
   await db.batch([
     db.insert(item).values({
       id,
       ownerId: actor.userId,
+      projectId,
       kind: data.kind,
-      title: data.title,
+      title,
       content,
       encrypted,
       language: data.language ?? null,
@@ -106,24 +220,30 @@ export async function createItem(actor: Actor, input: ItemInput) {
       id: newId(16),
       itemId: id,
       version: 1,
-      title: data.title,
+      title,
       content,
       encrypted,
       authorId: actor.userId,
       source: actor.source,
     }),
   ]);
+  if (isLog && data.content.trim()) await appendLog(actor, { id, text: data.content });
 
   return { id, url: itemUrl(id), version: 1, visibility };
 }
 
 export async function getItem(id: string, userId: string | null) {
-  const { item: row, owner, access } = await loadItem(id, userId);
+  const { item: row, owner, access, project: found } = await loadItem(id, userId);
+  const log = row.kind === "log" ? await latestLogEntries(row.id, 200) : null;
   return {
     id: row.id,
     kind: row.kind,
     title: row.title,
-    content: await openContent(row.content, row.encrypted),
+    content: log
+      ? log.entries.map((entry) => entry.body).join("\n")
+      : await openContent(row.content, row.encrypted),
+    /** Logs only: the seq of the last entry, to pass as `after` when tailing. */
+    cursor: log?.cursor,
     language: row.language,
     tags: row.tags,
     visibility: row.visibility,
@@ -131,6 +251,7 @@ export async function getItem(id: string, userId: string | null) {
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     owner,
+    project: found,
     access,
     url: itemUrl(row.id),
   };
@@ -141,9 +262,23 @@ export async function updateItem(actor: Actor, patch: ItemPatch) {
   const data = itemPatchSchema.parse(patch);
   const { item: current, access } = await loadItem(data.id, actor.userId);
   if (!canEdit(access)) throw forbidden("Only the owner and editors can change this item");
+  if (current.kind === "log" && data.content !== undefined) {
+    throw createError({
+      message: "Logs are append-only",
+      status: 400,
+      fix: "Use append_log to add to it, or start a new log",
+    });
+  }
   if (data.visibility && !canManage(access)) {
     throw forbidden("Only the owner can change who can see this item");
   }
+
+  const projectId =
+    data.project === undefined
+      ? current.projectId
+      : data.project === null
+        ? null
+        : (await projectForWriting(actor.userId, data.project)).id;
 
   const title = data.title ?? current.title;
   const content =
@@ -159,6 +294,7 @@ export async function updateItem(actor: Actor, patch: ItemPatch) {
       title,
       content,
       version,
+      projectId,
       language: data.language === undefined ? current.language : data.language,
       tags: data.tags ?? current.tags,
       visibility: data.visibility
@@ -204,21 +340,134 @@ export async function deleteItem(actor: Actor, id: string) {
   await db.delete(item).where(eq(item.id, id));
 }
 
+async function latestLogEntries(itemId: string, limit: number) {
+  const rows = await db
+    .select({ seq: logEntry.seq, body: logEntry.body })
+    .from(logEntry)
+    .where(eq(logEntry.itemId, itemId))
+    .orderBy(desc(logEntry.seq))
+    .limit(limit);
+  rows.reverse();
+  return { entries: rows, cursor: rows.at(-1)?.seq ?? 0 };
+}
+
+/** Adds an entry to a log. Owners and editors only; the item's updatedAt moves so lists resort. */
+export async function appendLog(actor: Actor, input: AppendLogInput) {
+  const data = appendLogSchema.parse(input);
+  const { item: current, access } = await loadItem(data.id, actor.userId);
+  if (current.kind !== "log") throw createError({ message: "Not a log item", status: 400 });
+  if (!canEdit(access)) throw forbidden("Only the owner and editors can add to this log");
+
+  const usage = await db
+    .select({
+      count: sql<number>`count(*)`,
+      bytes: sql<number>`coalesce(sum(length(${logEntry.body})), 0)`,
+    })
+    .from(logEntry)
+    .where(eq(logEntry.itemId, current.id))
+    .get();
+  if (
+    (usage?.count ?? 0) >= MAX_LOG_ENTRIES ||
+    (usage?.bytes ?? 0) + data.text.length > MAX_LOG_BYTES
+  ) {
+    throw createError({ message: "This log is full", status: 413, fix: "Start a new log item" });
+  }
+
+  // seq comes from the row itself so concurrent writers can't both read the same max.
+  // If two still collide, the unique index rejects one and it retries once.
+  const insert = () =>
+    db.batch([
+      db.insert(logEntry).values({
+        id: newId(16),
+        itemId: current.id,
+        seq: sql`(select coalesce(max(${logEntry.seq}), 0) + 1 from ${logEntry} where ${logEntry.itemId} = ${current.id})`,
+        body: data.text,
+        authorId: actor.userId,
+        source: actor.source,
+      }),
+      db.update(item).set({ updatedAt: new Date() }).where(eq(item.id, current.id)),
+    ]);
+  await insert().catch(insert);
+
+  const latest = await db
+    .select({ seq: logEntry.seq })
+    .from(logEntry)
+    .where(eq(logEntry.itemId, current.id))
+    .orderBy(desc(logEntry.seq))
+    .limit(1)
+    .get();
+  return { id: current.id, url: itemUrl(current.id), cursor: latest?.seq ?? 0 };
+}
+
+/** Entries after a cursor, oldest first. Anyone who can see the item can tail it. */
+export async function tailLog(userId: string | null, input: TailLogInput) {
+  const data = tailLogSchema.parse(input);
+  const { item: current } = await loadItem(data.id, userId);
+  if (current.kind !== "log") throw createError({ message: "Not a log item", status: 400 });
+
+  const entries = await db
+    .select({
+      seq: logEntry.seq,
+      body: logEntry.body,
+      source: logEntry.source,
+      createdAt: logEntry.createdAt,
+      authorName: user.name,
+    })
+    .from(logEntry)
+    .leftJoin(user, eq(user.id, logEntry.authorId))
+    .where(and(eq(logEntry.itemId, current.id), sql`${logEntry.seq} > ${data.after}`))
+    .orderBy(logEntry.seq)
+    .limit(data.limit);
+
+  return {
+    entries,
+    cursor: entries.at(-1)?.seq ?? data.after,
+    /** False when more entries were already waiting; call again with the new cursor. */
+    caughtUp: entries.length < data.limit,
+  };
+}
+export type LogTail = Awaited<ReturnType<typeof tailLog>>;
+
+/** Turns free text into a safe FTS5 query: each word quoted, as a prefix, all required. */
+function ftsQuery(text: string) {
+  const tokens = text
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}_.-]+/u)
+    .filter(Boolean)
+    .slice(0, 8);
+  return tokens.map((token) => `"${token.replaceAll('"', "")}"*`).join(" ");
+}
+
 export async function listItems(userId: string, input: ListItemsInput = {}) {
   const data = listItemsSchema.parse(input);
 
-  const isMember = exists(
-    db
-      .select({ one: sql`1` })
-      .from(itemMember)
-      .where(and(eq(itemMember.itemId, item.id), eq(itemMember.userId, userId))),
+  const isMember = or(
+    exists(
+      db
+        .select({ one: sql`1` })
+        .from(itemMember)
+        .where(and(eq(itemMember.itemId, item.id), eq(itemMember.userId, userId))),
+    ),
+    exists(
+      db
+        .select({ one: sql`1` })
+        .from(projectMember)
+        .where(and(eq(projectMember.projectId, item.projectId), eq(projectMember.userId, userId))),
+    ),
   );
+  const projectFilter =
+    data.project === undefined
+      ? undefined
+      : data.project === "unfiled"
+        ? isNull(item.projectId)
+        : eq(item.projectId, (await resolveProject(userId, data.project)).id);
   const filters: (SQL | undefined)[] = [
     data.scope === "mine"
       ? eq(item.ownerId, userId)
       : data.scope === "shared"
         ? isMember
         : or(eq(item.ownerId, userId), isMember),
+    projectFilter,
     data.kind ? eq(item.kind, data.kind) : undefined,
     data.tag
       ? exists(
@@ -236,14 +485,12 @@ export async function listItems(userId: string, input: ListItemsInput = {}) {
     );
   }
   if (data.query) {
-    const pattern = `%${data.query.toLowerCase()}%`;
-    filters.push(
-      or(
-        like(sql`lower(${item.title})`, pattern),
-        like(sql`lower(${item.tags})`, pattern),
-        and(eq(item.encrypted, false), like(sql`lower(${item.content})`, pattern)),
-      ),
-    );
+    const match = ftsQuery(data.query);
+    if (match) {
+      // item_fts is maintained by triggers (see the item_fts migration); prefix tokens make
+      // search-as-you-type match partial words.
+      filters.push(sql`${item.id} in (select item_id from item_fts where item_fts match ${match})`);
+    }
   }
 
   const rows = await db
@@ -260,19 +507,30 @@ export async function listItems(userId: string, input: ListItemsInput = {}) {
       ownerEmail: user.email,
       ownerImage: user.image,
       memberRole: itemMember.role,
+      projectRole: projectMember.role,
+      projectId: item.projectId,
+      projectName: project.name,
       preview: sql<string>`case when ${item.encrypted} then '' else substr(${item.content}, 1, 240) end`,
     })
     .from(item)
     .innerJoin(user, eq(user.id, item.ownerId))
     .leftJoin(itemMember, and(eq(itemMember.itemId, item.id), eq(itemMember.userId, userId)))
+    .leftJoin(project, eq(project.id, item.projectId))
+    .leftJoin(
+      projectMember,
+      and(eq(projectMember.projectId, item.projectId), eq(projectMember.userId, userId)),
+    )
     .where(and(...filters))
     .orderBy(desc(item.updatedAt))
     .limit(data.limit)
     .offset(data.offset);
 
-  return rows.map(({ memberRole, ...row }) => ({
+  return rows.map(({ memberRole, projectRole, ...row }) => ({
     ...row,
-    access: (row.ownerId === userId ? "owner" : memberRole) as Access,
+    access: resolveAccess(
+      { ownerId: row.ownerId, visibility: row.visibility, memberRole, projectRole },
+      userId,
+    ) as Exclude<Access, null | "public">,
     url: itemUrl(row.id),
   }));
 }
@@ -478,6 +736,252 @@ export async function claimInvites(userId: string, email: string) {
     ...invites.map((invite) => addMember(invite.itemId, userId, invite.role, invite.invitedBy)),
   ]);
 }
+
+export async function listProjects(userId: string) {
+  const rows = await accessibleProjects(userId);
+  return rows
+    .map((row) => withProjectAccess(row, userId))
+    .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+}
+export type ProjectSummary = Awaited<ReturnType<typeof listProjects>>[number];
+
+export async function createProject(actor: Actor, input: ProjectInput) {
+  const data = projectInputSchema.parse(input);
+  await assertCanCreateProject(actor.userId);
+  const key = data.key ? projectKey(data.key) : null;
+  const id = newId();
+  await db
+    .insert(project)
+    .values({ id, ownerId: actor.userId, name: data.name, key })
+    .catch((error: unknown) => {
+      throw createError({
+        message: "You already have a project for this repository",
+        status: 409,
+        fix: "Use list_projects to find it",
+        cause: error instanceof Error ? error : undefined,
+      });
+    });
+  return { id, name: data.name, key };
+}
+
+export async function updateProject(actor: Actor, patch: ProjectPatch) {
+  const data = projectPatchSchema.parse(patch);
+  const found = await resolveProject(actor.userId, data.id);
+  if (!canManage(found.access)) throw forbidden("Only the owner can change this project");
+  await db
+    .update(project)
+    .set({
+      name: data.name ?? found.name,
+      key: data.key === undefined ? found.key : data.key ? projectKey(data.key) : null,
+    })
+    .where(eq(project.id, found.id));
+  return { id: found.id };
+}
+
+/** Deletes the folder only; its items stay and become unfiled. */
+export async function deleteProject(actor: Actor, id: string) {
+  const found = await resolveProject(actor.userId, id);
+  if (!canManage(found.access)) throw forbidden("Only the owner can delete this project");
+  await db.delete(project).where(eq(project.id, found.id));
+}
+
+export async function listProjectMembers(userId: string, id: string) {
+  const found = await resolveProject(userId, id);
+  const members = await db
+    .select({
+      userId: projectMember.userId,
+      role: projectMember.role,
+      name: user.name,
+      email: user.email,
+      image: user.image,
+    })
+    .from(projectMember)
+    .innerJoin(user, eq(user.id, projectMember.userId))
+    .where(eq(projectMember.projectId, found.id));
+  return {
+    owner: { name: found.ownerName, email: found.ownerEmail },
+    members,
+  };
+}
+
+/** Project sharing needs an existing account; the person's whole folder appears at once. */
+export async function shareProject(actor: Actor, input: ShareProjectInput) {
+  const data = shareProjectSchema.parse(input);
+  const found = await resolveProject(actor.userId, data.id);
+  if (!canManage(found.access)) throw forbidden("Only the owner can share this project");
+  const target = await db
+    .select({ id: user.id, name: user.name, email: user.email })
+    .from(user)
+    .where(eq(sql`lower(${user.email})`, data.email))
+    .get();
+  if (!target) {
+    throw createError({
+      message: "No account with that email yet",
+      status: 404,
+      fix: "Ask them to sign in once, or share a single item to send an invite link",
+    });
+  }
+  if (target.id === found.ownerId) {
+    throw createError({ message: "You already own this project", status: 400 });
+  }
+  await db
+    .insert(projectMember)
+    .values({ projectId: found.id, userId: target.id, role: data.role })
+    .onConflictDoUpdate({
+      target: [projectMember.projectId, projectMember.userId],
+      set: { role: data.role },
+    });
+  return { status: "added" as const, email: target.email, name: target.name, role: data.role };
+}
+
+export async function unshareProject(actor: Actor, id: string, email: string) {
+  const found = await resolveProject(actor.userId, id);
+  const target = await db
+    .select({ id: user.id })
+    .from(user)
+    .where(eq(sql`lower(${user.email})`, email.trim().toLowerCase()))
+    .get();
+  const removingSelf = target?.id === actor.userId;
+  if (!canManage(found.access) && !removingSelf)
+    throw forbidden("Only the owner can change who has access");
+  await db
+    .delete(projectMember)
+    .where(and(eq(projectMember.projectId, found.id), eq(projectMember.userId, target?.id ?? "")));
+}
+
+/**
+ * Everything an agent should know when it starts working in a project: the memories and
+ * prompts filed there, which env items exist, and the tail of the most recent log.
+ */
+export async function getProjectContext(userId: string, ref: string) {
+  const found = await resolveProject(userId, ref);
+  const items = await listItems(userId, { project: found.id, limit: 100 });
+  const latestLog = items.find((row) => row.kind === "log");
+  const log = latestLog ? await tailLog(userId, { id: latestLog.id, after: 0, limit: 1000 }) : null;
+  const recentLog = log ? log.entries.slice(-20) : [];
+  const memories = await Promise.all(
+    items
+      .filter((row) => row.kind === "memory")
+      .slice(0, 20)
+      .map((row) => getItem(row.id, userId)),
+  );
+  return {
+    project: { id: found.id, name: found.name, key: found.key, access: found.access },
+    memories: memories.map((m) => ({ id: m.id, title: m.title, content: m.content, url: m.url })),
+    prompts: items
+      .filter((row) => row.kind === "prompt")
+      .map((row) => ({ id: row.id, title: row.title, tags: row.tags, url: row.url })),
+    envs: items
+      .filter((row) => row.kind === "env")
+      .map((row) => ({ id: row.id, title: row.title, url: row.url })),
+    code: items
+      .filter((row) => row.kind === "code")
+      .map((row) => ({ id: row.id, title: row.title, tags: row.tags, url: row.url })),
+    latestLog: latestLog
+      ? {
+          id: latestLog.id,
+          title: latestLog.title,
+          url: latestLog.url,
+          cursor: log?.cursor ?? 0,
+          recent: recentLog,
+        }
+      : null,
+    itemCount: items.length,
+  };
+}
+
+/**
+ * People connected to this user through sharing in either direction, with what is shared.
+ * Any of them can be added to a project without typing an email.
+ */
+export async function listContacts(userId: string) {
+  const sharedByMe = db
+    .select({ id: itemMember.userId })
+    .from(itemMember)
+    .innerJoin(item, eq(item.id, itemMember.itemId))
+    .where(eq(item.ownerId, userId));
+  const sharedWithMe = db
+    .select({ id: item.ownerId })
+    .from(itemMember)
+    .innerJoin(item, eq(item.id, itemMember.itemId))
+    .where(eq(itemMember.userId, userId));
+  const inMyProjects = db
+    .select({ id: projectMember.userId })
+    .from(projectMember)
+    .innerJoin(project, eq(project.id, projectMember.projectId))
+    .where(eq(project.ownerId, userId));
+  const ownersOfMyProjects = db
+    .select({ id: project.ownerId })
+    .from(projectMember)
+    .innerJoin(project, eq(project.id, projectMember.projectId))
+    .where(eq(projectMember.userId, userId));
+
+  const [people, itemsSharedByMe, itemsSharedWithMe, projects] = await Promise.all([
+    db
+      .select({ id: user.id, name: user.name, email: user.email, image: user.image })
+      .from(user)
+      .where(
+        and(
+          sql`${user.id} != ${userId}`,
+          or(
+            sql`${user.id} in ${sharedByMe}`,
+            sql`${user.id} in ${sharedWithMe}`,
+            sql`${user.id} in ${inMyProjects}`,
+            sql`${user.id} in ${ownersOfMyProjects}`,
+          ),
+        ),
+      ),
+    db
+      .select({ userId: itemMember.userId, count: sql<number>`count(*)` })
+      .from(itemMember)
+      .innerJoin(item, eq(item.id, itemMember.itemId))
+      .where(eq(item.ownerId, userId))
+      .groupBy(itemMember.userId),
+    db
+      .select({ ownerId: item.ownerId, count: sql<number>`count(*)` })
+      .from(itemMember)
+      .innerJoin(item, eq(item.id, itemMember.itemId))
+      .where(eq(itemMember.userId, userId))
+      .groupBy(item.ownerId),
+    // Every project I can see, with all of its people, to find the ones we share.
+    db
+      .select({
+        projectId: project.id,
+        name: project.name,
+        ownerId: project.ownerId,
+        memberId: projectMember.userId,
+      })
+      .from(project)
+      .leftJoin(projectMember, eq(projectMember.projectId, project.id))
+      .where(
+        or(
+          eq(project.ownerId, userId),
+          sql`${project.id} in ${db
+            .select({ id: projectMember.projectId })
+            .from(projectMember)
+            .where(eq(projectMember.userId, userId))}`,
+        ),
+      ),
+  ]);
+
+  const byMe = new Map(itemsSharedByMe.map((r) => [r.userId, r.count]));
+  const withMe = new Map(itemsSharedWithMe.map((r) => [r.ownerId, r.count]));
+  return people
+    .map((person) => ({
+      ...person,
+      itemsISharedWithThem: byMe.get(person.id) ?? 0,
+      itemsTheyShared: withMe.get(person.id) ?? 0,
+      sharedProjects: [
+        ...new Map(
+          projects
+            .filter((p) => p.ownerId === person.id || p.memberId === person.id)
+            .map((p) => [p.projectId, { id: p.projectId, name: p.name }]),
+        ).values(),
+      ],
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+export type Contact = Awaited<ReturnType<typeof listContacts>>[number];
 
 export async function getProfile(userId: string) {
   return db

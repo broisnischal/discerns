@@ -1,6 +1,6 @@
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 
-import { AppHeader } from "#/components/app-header.tsx";
+import { AppShell } from "#/components/app-shell.tsx";
 import { authQueryOptions } from "#/lib/auth/queries.ts";
 
 /**
@@ -31,11 +31,8 @@ export const Route = createFileRoute("/_auth")({
 
 function AuthLayout() {
   return (
-    <div className="flex min-h-svh flex-col">
-      <AppHeader />
-      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">
-        <Outlet />
-      </main>
-    </div>
+    <AppShell>
+      <Outlet />
+    </AppShell>
   );
 }

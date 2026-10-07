@@ -24,7 +24,7 @@ export const $getConsentDetails = createServerFn({ method: "GET" })
       throw createError({
         message: "This connection request expired",
         status: 400,
-        fix: "Start connecting again from Claude",
+        fix: "Start connecting again from your agent",
       });
     }
 

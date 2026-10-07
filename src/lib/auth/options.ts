@@ -1,9 +1,14 @@
 import { drizzleAdapter } from "@better-auth/drizzle-adapter/relations-v2";
 import { mcp } from "@better-auth/mcp";
+import { checkout, dodopayments, portal, webhooks } from "@dodopayments/better-auth";
+import type { Subscription } from "@dodopayments/core";
 import type { BetterAuthOptions } from "better-auth";
-import { createAuthMiddleware } from "better-auth/api";
+import { APIError, createAuthMiddleware, getSessionFromCtx } from "better-auth/api";
 import { jwt } from "better-auth/plugins";
 import { tanstackStartCookies } from "better-auth/tanstack-start";
+import DodoPayments from "dodopayments";
+
+import { PRO_PRICES, type BillingInterval } from "../billing/plan.ts";
 
 /**
  * Shared Better Auth configuration. Kept free of `cloudflare:workers` imports so
@@ -21,9 +26,38 @@ const isLoopback = (uri: string) => {
   }
 };
 
+const isPrivateUseScheme = (uri: string) => {
+  try {
+    return !["http:", "https:"].includes(new URL(uri).protocol);
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Agent callbacks that break RFC 8252 (a custom scheme with a naming authority), which client
+ * registration rejects. Each registers under a spec-valid alias and is accepted at
+ * authorization only as this exact URI, so this is not a general relaxation.
+ */
+const AGENT_CALLBACK_ALIASES: Record<string, string> = {
+  "cursor://anysphere.cursor-mcp/oauth/callback": "com.anysphere.cursor-mcp:/oauth/callback",
+};
+
 interface Credentials {
   clientId?: string;
   clientSecret?: string;
+}
+
+export interface BillingConfig {
+  apiKey: string;
+  webhookSecret: string;
+  environment: "test_mode" | "live_mode";
+  /** Dodo product ids for each Pro price. Yearly is optional until it exists in Dodo. */
+  proProductIds: Record<BillingInterval, string | undefined>;
+  /** Discount codes the server applies to this user's checkout for this product slug. */
+  checkoutDiscounts: (userId: string, slug: string) => Promise<string[]>;
+  /** Called for every subscription webhook so the app can store the plan. */
+  onSubscription: (event: string, subscription: Subscription) => Promise<void>;
 }
 
 export function authOptions(config: {
@@ -33,8 +67,13 @@ export function authOptions(config: {
   schema?: Record<string, unknown>;
   github: Credentials;
   google: Credentials;
+  /** Billing is optional so local dev works without payment keys. */
+  billing?: BillingConfig;
 }) {
-  const { github, google } = config;
+  const { github, google, billing } = config;
+  const subscriptionHook = (event: string) => async (payload: { data: Subscription }) => {
+    await billing?.onSubscription(event, payload.data);
+  };
 
   return {
     baseURL: config.baseURL,
@@ -68,23 +107,52 @@ export function authOptions(config: {
     },
 
     hooks: {
-      // Claude Code registers http://localhost redirect URIs without application_type,
-      // which Better Auth treats as "web" and rejects. Loopback-only clients are native apps.
       before: createAuthMiddleware(async (ctx) => {
+        if (ctx.path === "/dodopayments/checkout-session") {
+          // The plugin forwards the whole request body to Dodo, so a caller could add their own
+          // discount codes, free trials, or payment details. Accept only the product slug;
+          // discounts are decided here. Returned context is merged into the body, so extra
+          // fields must be rejected rather than dropped.
+          const body = (ctx.body ?? {}) as Record<string, unknown>;
+          if (typeof body.slug !== "string" || Object.keys(body).some((key) => key !== "slug")) {
+            throw new APIError("BAD_REQUEST", { message: "Only a product slug is accepted" });
+          }
+          const session = await getSessionFromCtx(ctx);
+          const discountCodes =
+            session && billing ? await billing.checkoutDiscounts(session.user.id, body.slug) : [];
+          if (discountCodes.length > 0)
+            return { context: { body: { discount_codes: discountCodes } } };
+          return;
+        }
         if (ctx.path !== "/oauth2/register") return;
         const body = (ctx.body ?? {}) as { application_type?: string; redirect_uris?: string[] };
-        if (
+        if (!body.redirect_uris?.length) return;
+        const redirectUris = body.redirect_uris.map((uri) => AGENT_CALLBACK_ALIASES[uri] ?? uri);
+        // Coding agents register loopback or app-scheme callbacks without application_type,
+        // which Better Auth treats as "web" and rejects. They are native apps.
+        const native =
           !body.application_type &&
-          body.redirect_uris?.length &&
-          body.redirect_uris.every(isLoopback)
-        ) {
-          return { context: { body: { ...body, application_type: "native" } } };
+          redirectUris.some((uri) => isLoopback(uri) || isPrivateUseScheme(uri));
+        return {
+          context: {
+            body: {
+              ...body,
+              redirect_uris: redirectUris,
+              ...(native && { application_type: "native" }),
+            },
+          },
+        };
+      }),
+      after: createAuthMiddleware(async (ctx) => {
+        // The MCP resource server fetches its own JWKS to verify access tokens. Letting the
+        // edge cache it turns that self-request into a cache hit instead of a D1 query.
+        if (ctx.path === "/jwks") {
+          ctx.setHeader("Cache-Control", "public, max-age=3600, stale-while-revalidate=86400");
         }
       }),
     },
 
     plugins: [
-      tanstackStartCookies(),
       // Signs MCP access tokens and serves /api/auth/jwks.
       jwt(),
       // OAuth 2.1 authorization server for the MCP endpoint at /mcp.
@@ -95,12 +163,54 @@ export function authOptions(config: {
         resource: `${config.baseURL}/mcp`,
         scopes: ["openid", "profile", "email", "offline_access", ...MCP_SCOPES],
         grantTypes: ["authorization_code", "refresh_token"],
-        // Claude registers itself with dynamic client registration on every new connection.
+        // Accept an aliased agent callback only for clients registered with its alias.
+        validateRedirectUri: (uri, registeredUris, defaultResult) =>
+          defaultResult ||
+          (uri in AGENT_CALLBACK_ALIASES && registeredUris.includes(AGENT_CALLBACK_ALIASES[uri]!)),
+        // Agents register themselves with dynamic client registration on every new connection.
         allowDynamicClientRegistration: true,
         allowUnauthenticatedClientRegistration: true,
         // Limits are per IP, and every claude.ai token or registration call comes from Anthropic's range.
         rateLimit: { token: { window: 60, max: 120 }, register: { window: 60, max: 30 } },
       }),
+      ...(billing
+        ? [
+            dodopayments({
+              client: new DodoPayments({
+                bearerToken: billing.apiKey,
+                environment: billing.environment,
+              }),
+              createCustomerOnSignUp: true,
+              getCustomerParams: (user) => ({ metadata: { userId: user.id } }),
+              use: [
+                checkout({
+                  products: (Object.keys(PRO_PRICES) as BillingInterval[]).flatMap((interval) => {
+                    const productId = billing.proProductIds[interval];
+                    return productId ? [{ productId, slug: PRO_PRICES[interval].slug }] : [];
+                  }),
+                  successUrl: "/app/settings?billing=success",
+                  authenticatedUsersOnly: true,
+                }),
+                portal(),
+                webhooks({
+                  webhookKey: billing.webhookSecret,
+                  onSubscriptionActive: subscriptionHook("active"),
+                  onSubscriptionRenewed: subscriptionHook("renewed"),
+                  onSubscriptionPlanChanged: subscriptionHook("plan_changed"),
+                  onSubscriptionUpdated: subscriptionHook("updated"),
+                  onSubscriptionOnHold: subscriptionHook("on_hold"),
+                  onSubscriptionPaused: subscriptionHook("paused"),
+                  onSubscriptionUnpaused: subscriptionHook("unpaused"),
+                  onSubscriptionCancelled: subscriptionHook("cancelled"),
+                  onSubscriptionExpired: subscriptionHook("expired"),
+                  onSubscriptionFailed: subscriptionHook("failed"),
+                }),
+              ],
+            }),
+          ]
+        : []),
+      // Must stay last so cookies set by the plugins above reach the framework cookie store.
+      tanstackStartCookies(),
     ],
 
     advanced: {

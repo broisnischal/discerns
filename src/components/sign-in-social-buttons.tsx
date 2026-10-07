@@ -35,13 +35,12 @@ function SignInSocialButton({
   return (
     <Button
       variant="outline"
-      className="w-full"
-      size="lg"
+      className="h-11 w-full justify-start gap-3 rounded-2xl px-4 text-[15px]"
       type="button"
       disabled={mutation.isSuccess || mutation.isPending}
       onClick={() => mutation.mutate()}
     >
-      <provider.icon className="size-4" aria-hidden="true" />
+      <provider.icon className="size-5" aria-hidden="true" />
       Continue with {provider.label}
     </Button>
   );

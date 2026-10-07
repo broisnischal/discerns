@@ -1,26 +1,45 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "ewiz-share",
+  "name": "discerns",
   "main": "src/server.ts",
   "compatibility_date": "2026-10-01",
   // global_fetch_strictly_public: requireMcpAuth fetches this Worker's own /api/auth/jwks, and
   // same-zone fetches otherwise skip Workers and go to the (nonexistent) origin.
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "account_id": "16b2c363a412bfaaec2a5a2572964728",
-  "routes": [{ "pattern": "share.ewiz.app", "custom_domain": true }],
+  "routes": [{ "pattern": "discerns.app", "custom_domain": true }],
   "workers_dev": false,
+  // Run near D1 rather than near the caller: MCP calls from claude.ai originate in the US
+  // while the database lives in APAC, so each query otherwise pays a long round trip.
+  "placement": { "mode": "smart" },
   "preview_urls": false,
   "observability": {
     "enabled": true,
     // evlog already emits one wide event per request
     "logs": { "invocation_logs": false },
   },
+  // Only secrets listed here are loaded from .dev.vars in local dev. Sign-in providers are
+  // optional in code but must be declared or the Worker never sees their credentials.
   "secrets": {
-    "required": ["BETTER_AUTH_SECRET", "ENCRYPTION_KEY"],
+    "required": [
+      "BETTER_AUTH_SECRET",
+      "ENCRYPTION_KEY",
+      "GITHUB_CLIENT_ID",
+      "GITHUB_CLIENT_SECRET",
+      "GOOGLE_CLIENT_ID",
+      "GOOGLE_CLIENT_SECRET",
+      "DODO_PAYMENTS_API_KEY",
+      "DODO_PAYMENTS_WEBHOOK_SECRET",
+      "DODO_PAYMENTS_ENVIRONMENT",
+      "DODO_PRO_MONTHLY_PRODUCT_ID",
+      "DODO_PRO_YEARLY_PRODUCT_ID",
+      "DODO_INTRO_DISCOUNT_CODE",
+    ],
   },
   "d1_databases": [
     {
       "binding": "DB",
+      // The database was created as "ewiz-share"; D1 databases cannot be renamed.
       "database_name": "ewiz-share",
       "database_id": "04c79f37-28d5-4235-a652-55e6a17e93a6",
       "migrations_dir": "drizzle",

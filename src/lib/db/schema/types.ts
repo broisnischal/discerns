@@ -1,4 +1,4 @@
-export const ITEM_KINDS = ["text", "prompt", "memory", "env", "code"] as const;
+export const ITEM_KINDS = ["text", "prompt", "memory", "env", "code", "log"] as const;
 export type ItemKind = (typeof ITEM_KINDS)[number];
 
 /**

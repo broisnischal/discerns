@@ -1,0 +1,17 @@
+{
+  "name": "discerns",
+  "displayName": "discerns",
+  "version": "0.2.0",
+  "description": "A shared clipboard for you, your team, and Claude: prompts, memories, snippets, encrypted .env files, and live logs, organized by repository. Claude saves, finds, shares, and streams progress over MCP.",
+  "author": {
+    "name": "Nischal Dahal"
+  },
+  "homepage": "https://discerns.app",
+  "keywords": ["sharing", "prompts", "memory", "env", "logs", "team", "mcp"],
+  "mcpServers": {
+    "discerns": {
+      "type": "http",
+      "url": "https://discerns.app/mcp"
+    }
+  }
+}

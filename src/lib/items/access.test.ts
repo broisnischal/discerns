@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vite-plus/test";
 
-import { allowedVisibility, canEdit, canManage, resolveAccess } from "./access";
+import { allowedVisibility, canEdit, canManage, projectKey, resolveAccess } from "./access";
 
 describe("resolveAccess", () => {
   const base = { ownerId: "owner", visibility: "private" as const, memberRole: null };
@@ -21,6 +21,13 @@ describe("resolveAccess", () => {
     [
       "collaborator role wins over public",
       { ...base, visibility: "public" as const, memberRole: "editor" as const },
+      "bob",
+      "editor",
+    ],
+    ["project viewer", { ...base, projectRole: "viewer" as const }, "bob", "viewer"],
+    [
+      "stronger of direct and project role wins",
+      { ...base, memberRole: "viewer" as const, projectRole: "editor" as const },
       "bob",
       "editor",
     ],
@@ -47,4 +54,13 @@ test("env items are always private", () => {
   expect(allowedVisibility("env", "public")).toBe("private");
   expect(allowedVisibility("env", "link")).toBe("private");
   expect(allowedVisibility("prompt", "public")).toBe("public");
+});
+
+test.each([
+  ["git@github.com:acme/api.git", "github.com/acme/api"],
+  ["https://github.com/Acme/API.git", "github.com/acme/api"],
+  ["ssh://git@gitlab.com/team/sub/repo", "gitlab.com/team/sub/repo"],
+  ["  my-side-project ", "my-side-project"],
+])("projectKey(%s) → %s", (input, expected) => {
+  expect(projectKey(input)).toBe(expected);
 });

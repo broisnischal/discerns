@@ -10,6 +10,7 @@ import { EvlogError } from "evlog";
 import { ThemeProvider } from "#/components/theme-provider.tsx";
 import { Toaster } from "#/components/ui/toast.tsx";
 import { TooltipProvider } from "#/components/ui/tooltip.tsx";
+import { authQueryOptions } from "#/lib/auth/queries.ts";
 import { APP_DESCRIPTION, APP_NAME } from "#/lib/site.ts";
 
 import appCss from "#/styles.css?url";
@@ -29,6 +30,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         }
       }),
     ],
+  },
+  // Every page renders differently signed in, so resolve the session before the first
+  // paint. Served from cache after that; the protected layouts revalidate it.
+  beforeLoad: async ({ context }) => {
+    await context.queryClient.query({ ...authQueryOptions(), staleTime: "static" });
   },
   head: () => ({
     meta: [

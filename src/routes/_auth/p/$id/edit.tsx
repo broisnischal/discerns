@@ -1,7 +1,8 @@
 import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 
-import { ItemEditor, parseTags } from "#/components/item-editor.tsx";
+import { ItemEditor } from "#/components/item-editor.tsx";
+import { PageHeader } from "#/components/page-header.tsx";
 import { toast } from "#/components/ui/toast.tsx";
 import { $updateItem } from "#/lib/items/functions.ts";
 import { itemKeys, itemQueryOptions } from "#/lib/items/queries.ts";
@@ -31,29 +32,35 @@ function EditItem() {
 
   if (item.access !== "owner" && item.access !== "editor") {
     return (
-      <p className="rounded-xl border p-6 text-sm text-muted-foreground">
+      <p className="surface p-6 text-sm text-muted-foreground">
         You can view this item but not edit it. Ask {item.owner.name} for editor access.
       </p>
     );
   }
 
   const isOwner = item.access === "owner";
+  const isLog = item.kind === "log";
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-6">
-      <h1 className="text-2xl font-semibold tracking-tight">Edit item</h1>
+    <div className="flex flex-col gap-6">
+      <PageHeader
+        back={{ to: "/p/$id", label: item.title, params: { id } } as never}
+        title="Edit item"
+      />
       <ItemEditor
         initial={{
           title: item.title,
           content: item.content,
           kind: item.kind,
           language: item.language ?? "",
-          tags: item.tags.join(", "),
+          tags: item.tags,
           visibility: item.visibility,
+          project: item.project?.id ?? null,
         }}
         kindLocked
         canChangeVisibility={isOwner}
-        submitLabel="Save new version"
+        contentLocked={isLog}
+        submitLabel={isLog ? "Save" : "Save new version"}
         pending={mutation.isPending}
         onCancel={() => navigate({ to: "/p/$id", params: { id } })}
         onSubmit={(draft) =>
@@ -61,9 +68,10 @@ function EditItem() {
             data: {
               id,
               title: draft.title,
-              content: draft.content,
+              ...(!isLog && { content: draft.content }),
               language: draft.language || null,
-              tags: parseTags(draft.tags),
+              tags: draft.tags,
+              project: draft.project,
               ...(isOwner && { visibility: draft.visibility }),
             },
           })

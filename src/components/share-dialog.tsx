@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { LoaderCircleIcon, Share2Icon, XIcon } from "lucide-react";
 import { useState } from "react";
 
 import { CopyButton } from "#/components/copy-button.tsx";
+import { LoaderCircleIcon, Share2Icon, XIcon } from "#/components/icons.ts";
 import { VISIBILITY_META } from "#/components/item-list.tsx";
 import { Avatar, AvatarFallback, AvatarImage } from "#/components/ui/avatar.tsx";
 import { Button } from "#/components/ui/button.tsx";
@@ -46,9 +46,10 @@ function RoleSelect({
       value={value}
       onValueChange={(role) => onChange(role as MemberRole)}
       disabled={disabled}
+      items={ROLE_LABEL}
     >
       <SelectTrigger size="sm" className="w-28" aria-label="Role">
-        <SelectValue>{(role: MemberRole) => ROLE_LABEL[role]}</SelectValue>
+        <SelectValue />
       </SelectTrigger>
       <SelectContent>
         <SelectItem value="viewer">Can view</SelectItem>
@@ -104,7 +105,7 @@ export function ShareDialog({ item }: { item: ItemDetail }) {
         <DialogHeader>
           <DialogTitle>Share &ldquo;{item.title}&rdquo;</DialogTitle>
           <DialogDescription>
-            People you add can find this item in their list and through Claude.
+            People you add can find this item in their list and through their coding agents.
           </DialogDescription>
         </DialogHeader>
 
@@ -212,9 +213,15 @@ export function ShareDialog({ item }: { item: ItemDetail }) {
                   data: { id: item.id, visibility: visibility as ItemVisibility },
                 })
               }
+              items={Object.fromEntries(
+                ITEM_VISIBILITIES.map((visibility) => [
+                  visibility,
+                  VISIBILITY_META[visibility].label,
+                ]),
+              )}
             >
               <SelectTrigger size="sm" className="w-52" aria-label="Link access">
-                <SelectValue>{(value: ItemVisibility) => VISIBILITY_META[value].label}</SelectValue>
+                <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 {ITEM_VISIBILITIES.map((visibility) => (

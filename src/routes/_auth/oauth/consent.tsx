@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
-import { CheckIcon, LoaderCircleIcon } from "lucide-react";
 
+import { CheckIcon, LoaderCircleIcon } from "#/components/icons.ts";
 import { Button } from "#/components/ui/button.tsx";
 import {
   Card,

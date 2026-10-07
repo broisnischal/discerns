@@ -10,7 +10,7 @@ declare module "@tanstack/react-router" {
   }
 }
 
-initWorkersLogger({ env: { service: "ewiz-share" } });
+initWorkersLogger({ env: { service: "discerns" } });
 
 // One structured wide event per request. The logger is also bound to async storage
 // so server code can reach it with useLogger() from lib/logger.server.ts.
