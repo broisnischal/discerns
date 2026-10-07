@@ -1,0 +1,17 @@
+{
+  "name": "ewiz-share",
+  "displayName": "ewiz share",
+  "version": "0.1.0",
+  "description": "Save, share, and retrieve prompts, memories, snippets, and encrypted .env files with collaborators on share.ewiz.app.",
+  "author": {
+    "name": "Nischal Dahal"
+  },
+  "homepage": "https://share.ewiz.app",
+  "keywords": ["pastebin", "sharing", "prompts", "memory", "env", "mcp"],
+  "mcpServers": {
+    "ewiz-share": {
+      "type": "http",
+      "url": "https://share.ewiz.app/mcp"
+    }
+  }
+}

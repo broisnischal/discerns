@@ -1,0 +1,15 @@
+{
+  "name": "ewiz",
+  "owner": {
+    "name": "Nischal Dahal"
+  },
+  "description": "Claude plugins from ewiz.",
+  "plugins": [
+    {
+      "name": "ewiz-share",
+      "description": "Save, share, and retrieve prompts, memories, snippets, and encrypted .env files with collaborators on share.ewiz.app.",
+      "version": "0.1.0",
+      "source": "./plugins/ewiz-share"
+    }
+  ]
+}

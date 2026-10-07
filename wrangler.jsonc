@@ -1,0 +1,28 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ewiz-share",
+  "main": "src/server.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "account_id": "16b2c363a412bfaaec2a5a2572964728",
+  "routes": [{ "pattern": "share.ewiz.app", "custom_domain": true }],
+  "workers_dev": false,
+  "preview_urls": false,
+  "observability": {
+    "enabled": true,
+    // evlog already emits one wide event per request
+    "logs": { "invocation_logs": false },
+  },
+  "secrets": {
+    "required": ["BETTER_AUTH_SECRET", "ENCRYPTION_KEY"],
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "ewiz-share",
+      "database_id": "04c79f37-28d5-4235-a652-55e6a17e93a6",
+      "migrations_dir": "drizzle",
+      "migrations_pattern": "drizzle/*/migration.sql",
+    },
+  ],
+}
