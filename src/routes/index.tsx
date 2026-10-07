@@ -24,6 +24,7 @@ import { Button } from "#/components/ui/button.tsx";
 import { useAuth } from "#/lib/auth/hooks.ts";
 import { INTRO_PRICE, LIMITS, PRO_PRICES, YEARLY_SAVINGS_PERCENT } from "#/lib/billing/plan.ts";
 import { $getPricing } from "#/lib/items/functions.ts";
+import { ENTERPRISE_MAILTO } from "#/lib/site.ts";
 
 export const Route = createFileRoute("/")({
   loader: async ({ context }) => {
@@ -243,12 +244,14 @@ function HomePage() {
       </section>
 
       {/* Pricing */}
-      <section id="pricing" className="mx-auto w-full max-w-4xl scroll-mt-20 px-5 py-20 sm:px-8">
+      <section id="pricing" className="mx-auto w-full max-w-6xl scroll-mt-20 px-5 py-20 sm:px-8">
         <div className="mb-10 space-y-2 text-center">
           <h2 className="text-3xl font-semibold tracking-tight">Simple pricing</h2>
-          <p className="text-muted-foreground">Start free. Upgrade when your agents need it.</p>
+          <p className="text-muted-foreground">
+            Start free. Upgrade when your agents need it. Talk to us when your company does.
+          </p>
         </div>
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           <PlanCard
             name="Free"
             price="$0"
@@ -304,6 +307,27 @@ function HomePage() {
               </Button>
             }
           />
+          <PlanCard
+            name="Enterprise"
+            price="Custom"
+            note="For companies rolling discerns out to a team"
+            features={[
+              "Everything in Pro, for every seat",
+              "Volume pricing and one invoice for the company",
+              "Help setting up projects and agents for your team",
+              "Priority support from the people who build it",
+            ]}
+            cta={
+              <Button
+                render={<a href={ENTERPRISE_MAILTO} />}
+                nativeButton={false}
+                variant="outline"
+                className="w-full"
+              >
+                Contact us
+              </Button>
+            }
+          />
         </div>
       </section>
     </SiteLayout>
@@ -321,7 +345,8 @@ function PlanCard({
 }: {
   name: string;
   price: string;
-  per: string;
+  /** Omitted for prices that are not per period, such as "Custom". */
+  per?: string;
   note: string;
   features: string[];
   cta: React.ReactNode;
@@ -332,14 +357,14 @@ function PlanCard({
       className={
         highlight
           ? "flex flex-col gap-6 rounded-3xl bg-selected p-6 shadow-[inset_0_0_0_2px_var(--primary)]"
-          : "flex flex-col gap-6 surface p-6"
+          : "flex flex-col gap-6 surface p-6 md:last:col-span-2 lg:last:col-span-1"
       }
     >
       <div className="space-y-3">
         <h3 className="font-medium">{name}</h3>
         <p className="flex items-baseline gap-1">
           <span className="text-4xl font-semibold tracking-tight tabular-nums">{price}</span>
-          <span className="text-sm text-muted-foreground">/ {per}</span>
+          {per && <span className="text-sm text-muted-foreground">/ {per}</span>}
         </p>
         <p className="text-sm text-muted-foreground">{note}</p>
       </div>

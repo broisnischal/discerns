@@ -4,6 +4,8 @@ export const APP_DESCRIPTION =
 
 /** Where legal and support questions go. Needs a mailbox or Cloudflare Email Routing rule. */
 export const CONTACT_EMAIL = "support@discerns.app";
+/** Enterprise enquiries open a pre-addressed email with a subject the inbox can filter on. */
+export const ENTERPRISE_MAILTO = `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent("discerns Enterprise")}`;
 /** Shown on the legal pages; bump when the terms or privacy policy change. */
 export const LEGAL_UPDATED = "October 7, 2026";
 

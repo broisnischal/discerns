@@ -26,6 +26,7 @@ import { authQueryOptions } from "#/lib/auth/queries.ts";
 import { PRO_PRICES, YEARLY_SAVINGS_PERCENT, type BillingInterval } from "#/lib/billing/plan.ts";
 import { initials, timeAgo } from "#/lib/format.ts";
 import { billingQueryOptions } from "#/lib/items/queries.ts";
+import { ENTERPRISE_MAILTO } from "#/lib/site.ts";
 import { cn } from "#/lib/utils.ts";
 
 export const Route = createFileRoute("/_auth/app/settings")({
@@ -554,7 +555,11 @@ function BillingTab() {
                 : `Upgrade to Pro · ${price.price} / ${price.per}`}
             </Button>
             <span className="text-xs text-muted-foreground">
-              Secure checkout by Dodo Payments. Cancel anytime.
+              Secure checkout by Dodo Payments. Cancel anytime. Buying for a company?{" "}
+              <a href={ENTERPRISE_MAILTO} className="text-foreground underline underline-offset-4">
+                Contact us
+              </a>
+              .
             </span>
           </div>
         </section>
