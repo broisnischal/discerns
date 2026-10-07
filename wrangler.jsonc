@@ -3,7 +3,9 @@
   "name": "ewiz-share",
   "main": "src/server.ts",
   "compatibility_date": "2026-10-01",
-  "compatibility_flags": ["nodejs_compat"],
+  // global_fetch_strictly_public: requireMcpAuth fetches this Worker's own /api/auth/jwks, and
+  // same-zone fetches otherwise skip Workers and go to the (nonexistent) origin.
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "account_id": "16b2c363a412bfaaec2a5a2572964728",
   "routes": [{ "pattern": "share.ewiz.app", "custom_domain": true }],
   "workers_dev": false,
