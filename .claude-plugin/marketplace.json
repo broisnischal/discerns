@@ -7,8 +7,8 @@
   "plugins": [
     {
       "name": "discerns",
-      "description": "A shared clipboard for you, your team, and Claude: prompts, memories, snippets, encrypted .env files, and live logs, organized by repository.",
-      "version": "0.2.0",
+      "description": "A shared clipboard for you, your team, and your coding agents: prompts, memories, snippets, encrypted env files, and live logs, organized by repository.",
+      "version": "0.3.0",
       "source": "./plugins/discerns"
     }
   ]

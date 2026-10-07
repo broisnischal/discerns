@@ -7,6 +7,7 @@ import {
   type CallToolResult,
   type RegisteredTool,
 } from "@modelcontextprotocol/server";
+import { parseError } from "evlog";
 import { z } from "zod";
 
 import { INTRO_PRICE, PRO_PRICES, type Plan } from "#/lib/billing/plan.ts";
@@ -22,17 +23,38 @@ const idOrUrl = z
   .transform((value) => /\/p\/([A-Za-z0-9]+)/.exec(value)?.[1] ?? value)
   .describe("Item id, or the item URL");
 
+/**
+ * Tool results are read by a model, so they are compact: no indentation and no null
+ * fields. Every byte here is a token the agent pays for on each call.
+ */
 const json = (value: unknown): CallToolResult => ({
-  content: [{ type: "text", text: JSON.stringify(value, null, 2) }],
+  content: [
+    {
+      type: "text",
+      text: JSON.stringify(value, (_key, v: unknown) => (v === null ? undefined : v)),
+    },
+  ],
 });
 
-const INSTRUCTIONS = `${APP_NAME} stores prompts, memories, notes, code snippets, env files, and live logs for the signed-in user, and shares them with collaborators by email.
-- Use kind "env" for anything secret; env items are encrypted and always private.
-- Use kind "log" to narrate work as it happens: save_item once, then append_log for each step, result, or error. People and other agent sessions watch it live at the item URL and read new lines with tail_log.
-- Projects are folders, usually one per repository. At the start of a session resolve the project from the repo's git remote (e.g. github.com/acme/api) and call get_project_context; pass that project on save_item and list_items so items land in the right folder.
-- list_items returns summaries; call get_item for full content.
-- Every update creates a version; item_history and restore_version work with them. Logs are append-only.
-- Return the item URL to the user after saving or sharing.`;
+/** A failed tool call says what went wrong and how to recover, so the agent can act on it. */
+function agentError(error: unknown): CallToolResult {
+  const { message, why, fix } = parseError(error);
+  const text = [message, why, fix ? `Fix: ${fix}` : undefined].filter(Boolean).join(". ");
+  return { isError: true, content: [{ type: "text", text }] };
+}
+
+/** Collapses whitespace and shortens a preview so list results stay small. */
+const shortPreview = (text: string) => {
+  const flat = text.replace(/\s+/g, " ").trim();
+  return flat.length > 160 ? `${flat.slice(0, 157)}…` : flat || undefined;
+};
+
+const INSTRUCTIONS = `${APP_NAME} stores prompts, memories, notes, code, env files, and live logs for the user and shares them by email.
+- Working in a repo: call get_project_context once with its git remote (github.com/owner/repo), then pass that project to save_item and list_items.
+- list_items returns short summaries; read full content with get_item, or get_items for several at once.
+- Secrets go in kind "env" (encrypted, always private). Never put secrets in logs.
+- To narrate work, save_item a "log" once, then append_log per step; others follow it with tail_log.
+- Results are compact JSON; empty fields are omitted. Give the user the item URL after saving or sharing.`;
 
 /** What a non-Pro caller gets from every tool except whoami: a message the agent can relay. */
 function subscriptionRequired(): CallToolResult {
@@ -90,33 +112,20 @@ export function createMcpServer(userId: string, plan: Plan) {
       {
         title: "Save item",
         description:
-          "Save a new item: a prompt, memory, note, code snippet, env file, or log. Returns its id and URL. Store content exactly as given. For a log, content is the optional first entry; add more with append_log.",
+          "Save a prompt, memory, note, code, env file, or log. Store content verbatim. Returns id and URL.",
         inputSchema: z.object({
-          title: z
-            .string()
-            .max(200)
-            .optional()
-            .describe("Short, specific title. Omit to use the first line of the content."),
+          title: z.string().max(200).optional().describe("Omit to use the first line"),
           content: z.string().describe("The full content, verbatim"),
-          project: z
-            .string()
-            .optional()
-            .describe(
-              "Project to file it in: id, key like github.com/acme/api, git remote URL, or name",
-            ),
+          project: z.string().optional().describe("Project: git remote, key, id, or name"),
           kind: z
             .enum(ITEM_KINDS)
             .default("text")
-            .describe(
-              "prompt, memory, env (secrets, encrypted), code, log (append-only, live), or text",
-            ),
+            .describe("env for secrets; log for live, append-only notes"),
           tags: z.array(z.string()).max(20).optional().describe("1 to 4 lowercase tags"),
           visibility: z
             .enum(ITEM_VISIBILITIES)
             .default("private")
-            .describe(
-              "private (owner and collaborators), link (anyone with the URL), public. Env items are always private.",
-            ),
+            .describe("link and public are readable by anyone with the URL"),
           language: z.string().max(40).optional().describe("Language for code items, e.g. ts"),
         }),
       },
@@ -148,11 +157,36 @@ export function createMcpServer(userId: string, plan: Plan) {
 
   paid(
     server.registerTool(
+      "get_items",
+      {
+        title: "Get several items",
+        description: "Read up to 20 items in one call. Unreadable ids return an error entry.",
+        inputSchema: z.object({
+          ids: z.array(idOrUrl).min(1).max(20).describe("Item ids or URLs"),
+        }),
+        annotations: { readOnlyHint: true },
+      },
+      async ({ ids }) =>
+        json(
+          await Promise.all(
+            [...new Set(ids)].map((id) =>
+              items.getItem(id, userId).catch((error: unknown) => ({
+                id,
+                error: parseError(error).message,
+              })),
+            ),
+          ),
+        ),
+    ),
+  );
+
+  paid(
+    server.registerTool(
       "list_items",
       {
         title: "List items",
         description:
-          'List or search items the user owns or that were shared with them, newest first. Use scope "shared" with `owner` to see what a specific person shared.',
+          'List or full-text search items, newest first. Returns summaries; use scope "shared" with owner for one person\'s shares.',
         inputSchema: z.object({
           scope: z.enum(["all", "mine", "shared"]).default("all"),
           project: z
@@ -175,14 +209,14 @@ export function createMcpServer(userId: string, plan: Plan) {
             id: row.id,
             title: row.title,
             kind: row.kind,
-            tags: row.tags,
-            visibility: row.visibility,
-            access: row.access,
-            owner: { name: row.ownerName, email: row.ownerEmail },
-            project: row.projectId ? { id: row.projectId, name: row.projectName } : null,
+            tags: row.tags.length > 0 ? row.tags : undefined,
+            project: row.projectName,
+            // Only shared items name their owner; everything else is the caller's own.
+            owner: row.access === "owner" ? undefined : `${row.ownerName} <${row.ownerEmail}>`,
+            access: row.access === "owner" ? undefined : row.access,
+            visibility: row.visibility === "private" ? undefined : row.visibility,
             updatedAt: row.updatedAt,
-            version: row.version,
-            preview: row.preview,
+            preview: shortPreview(row.preview),
             url: row.url,
           })),
         );
@@ -221,8 +255,7 @@ export function createMcpServer(userId: string, plan: Plan) {
       "share_item",
       {
         title: "Share item",
-        description:
-          "Give someone access by email. People with an account get access immediately; otherwise the result has an inviteUrl for the user to send them.",
+        description: "Share by email. Without an account the result has an inviteUrl to send them.",
         inputSchema: z.object({
           id: idOrUrl,
           email: z.string().describe("The person's email address"),
@@ -326,7 +359,7 @@ export function createMcpServer(userId: string, plan: Plan) {
       {
         title: "Project context",
         description:
-          "Everything worth knowing before working in a project: its memories (full text), prompts, env items, code snippets, and the tail of its latest log. Call this first when starting work in a repository.",
+          "Call first in a repo: the project's memories in full, prompts, env and code items, and its latest log tail.",
         inputSchema: z.object({
           project: z
             .string()
@@ -362,8 +395,7 @@ export function createMcpServer(userId: string, plan: Plan) {
       "append_log",
       {
         title: "Append to log",
-        description:
-          "Add a line or block to a log item. Everyone it is shared with sees it live. Use it to stream progress, command output, test results, or errors while you work. Keep secrets out of logs.",
+        description: "Append a step, output, or error to a log. Viewers see it live. No secrets.",
         inputSchema: z.object({
           id: idOrUrl,
           text: z.string().min(1).describe("The text to append, verbatim"),
@@ -379,7 +411,7 @@ export function createMcpServer(userId: string, plan: Plan) {
       {
         title: "Tail log",
         description:
-          "Read a log's entries after a cursor, oldest first. Pass the returned cursor next time to get only what is new. Use it to follow what another agent session or a teammate is doing.",
+          "Read log entries after a cursor, oldest first. Pass the returned cursor next time for only new ones.",
         inputSchema: z.object({
           id: idOrUrl,
           after: z
@@ -439,10 +471,25 @@ export function createMcpServer(userId: string, plan: Plan) {
     },
   );
 
-  if (plan !== "pro") {
-    for (const tool of paidTools) tool.update({ callback: subscriptionRequired });
-    itemsResource.disable();
+  for (const tool of paidTools) {
+    if (plan !== "pro") {
+      tool.update({ callback: subscriptionRequired });
+      continue;
+    }
+    // The SDK types a registered handler as a union over every schema; this re-wraps the
+    // same handler with the same arguments, so widening it here is safe.
+    const run = tool.handler as (...args: unknown[]) => Promise<CallToolResult>;
+    tool.update({
+      callback: async (...args: unknown[]) => {
+        try {
+          return await run(...args);
+        } catch (error) {
+          return agentError(error);
+        }
+      },
+    });
   }
+  if (plan !== "pro") itemsResource.disable();
 
   return server;
 }

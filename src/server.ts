@@ -19,7 +19,7 @@ const LEGACY_HOSTS = new Set(["share.ewiz.app"]);
 const ORIGIN = new URL(import.meta.env.VITE_BASE_URL);
 
 export default withEvlog<Env>(
-  (request, _env, _ctx, log) => {
+  async (request, _env, ctx, log) => {
     const url = new URL(request.url);
     if (LEGACY_HOSTS.has(url.hostname)) {
       url.protocol = ORIGIN.protocol;
@@ -27,7 +27,19 @@ export default withEvlog<Env>(
       // 308 keeps the method and body, so POSTs to old endpoints are redirected intact.
       return Response.redirect(url.toString(), 308);
     }
-    return loggerStorage.run(log, () => handler.fetch(request, { context: { log } }));
+    const respond = () =>
+      loggerStorage.run(log, () => handler.fetch(request, { context: { log } }));
+    // Every MCP call verifies its token against this JWKS. Serving it from the edge cache
+    // keeps that self-request off Better Auth and the database.
+    if (request.method === "GET" && url.pathname === "/api/auth/jwks") {
+      const cache = await caches.open("jwks");
+      const cached = await cache.match(request);
+      if (cached) return cached;
+      const response = await respond();
+      if (response.ok) ctx.waitUntil(cache.put(request, response.clone()));
+      return response;
+    }
+    return respond();
   },
   {
     redact: {

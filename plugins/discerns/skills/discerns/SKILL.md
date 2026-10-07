@@ -11,7 +11,7 @@ Items live in **projects**, one per repository. Every item has a kind, an owner,
 
 Do this once, before saving or searching while working in a repo:
 
-1. `git remote get-url origin` → pass it as `project` everywhere. The server normalizes it to `github.com/owner/repo`. No remote: use the folder name.
+1. The session-start note names this repo's project when the plugin is installed. Otherwise run `git remote get-url origin` and pass it as `project` everywhere. The server normalizes it to `github.com/owner/repo`. No remote: use the folder name.
 2. `get_project_context` with that key. Read the memories in full and the tail of the latest log. That is the team's decisions and where the last session stopped.
 3. "Project not found" → `create_project` with the repo name and the remote URL as `key`, then continue.
 4. Pass `project` on every `save_item` and `list_items` from then on. Omit it only for things unrelated to this repo.
@@ -55,6 +55,8 @@ A log is for work others should be able to watch.
 - `unshare_item` removes a collaborator or a pending invite.
 
 ## Finding things
+
+Results are compact JSON with empty fields left out. `list_items` gives short summaries; read several items at once with `get_items` instead of calling `get_item` in a loop.
 
 - Repo context: `get_project_context`, or `list_items` with `project`.
 - "What has Sam shared with me?" → `list_items` with `scope: "shared"`, `owner: "sam"`.

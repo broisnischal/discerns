@@ -12,6 +12,6 @@ export const LEGAL_UPDATED = "October 7, 2026";
 export const PLUGIN_NAME = "discerns";
 export const MARKETPLACE_NAME = "discerns";
 /** GitHub `owner/repo` that hosts .claude-plugin/marketplace.json. Empty until published. */
-export const MARKETPLACE_REPO: string = "";
+export const MARKETPLACE_REPO: string = "broisnischal/ewiz-share";
 /** Built by `vpr skill:pack` from plugins/discerns/skills/discerns. */
 export const SKILL_ZIP_PATH = "/downloads/discerns-skill.zip";

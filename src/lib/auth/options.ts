@@ -144,11 +144,10 @@ export function authOptions(config: {
         };
       }),
       after: createAuthMiddleware(async (ctx) => {
-        // The MCP resource server fetches its own JWKS to verify access tokens. Letting the
-        // edge cache it turns that self-request into a cache hit instead of a D1 query.
-        if (ctx.path === "/jwks") {
-          ctx.setHeader("Cache-Control", "public, max-age=3600, stale-while-revalidate=86400");
-        }
+        // The MCP resource server fetches this JWKS to verify access tokens; src/server.ts
+        // keeps it in the Cache API for this long. Short enough that a new key is picked up
+        // quickly, long enough that token checks rarely reach the database.
+        if (ctx.path === "/jwks") ctx.setHeader("Cache-Control", "public, max-age=300");
       }),
     },
 
