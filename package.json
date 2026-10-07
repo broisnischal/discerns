@@ -30,7 +30,7 @@
     "auth:migrate": "vp run auth:generate && vp run db:generate && vp run db:migrate:local",
     "skills": "pnpm dlx skills@latest",
     "intent": "pnpm dlx @tanstack/intent@latest",
-    "skill:pack": "cd plugins/discerns/skills && rm -f ../../../public/downloads/discerns-skill.zip && zip -qr ../../../public/downloads/discerns-skill.zip discerns && awk 'n>=2{print} /^---$/{n++}' discerns/SKILL.md > ../../../public/downloads/discerns-agent.md",
+    "skill:pack": "cd plugins/discerns/skills && rm -f ../../../public/downloads/discerns-skill.zip && zip -qr ../../../public/downloads/discerns-skill.zip discerns && awk 'n>=2{print} /^---$/{n++}' discerns/SKILL.md | sed '/./,$!d' > ../../../public/downloads/discerns-agent.md",
     "deploy": "vp run skill:pack && vp build && wrangler deploy",
     "cf-typegen": "wrangler types",
     "postinstall": "WRANGLER_LOG=warn wrangler types",

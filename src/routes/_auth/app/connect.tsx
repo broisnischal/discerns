@@ -76,33 +76,70 @@ function RulesStep({ n, file }: { n: number; file: string }) {
 function AgentSteps({ agent, mcpUrl }: { agent: AgentId; mcpUrl: string }) {
   const json = (value: unknown) => JSON.stringify(value, null, 2);
   switch (agent) {
-    case "claude-code":
+    case "claude-code": {
+      const skillCommand = `mkdir -p ~/.claude/skills && curl -fsSL ${import.meta.env.VITE_BASE_URL}${SKILL_ZIP_PATH} -o /tmp/discerns-skill.zip && unzip -oq /tmp/discerns-skill.zip -d ~/.claude/skills`;
       return (
-        <ol className="flex flex-col gap-6">
-          <Step n={1}>
-            {MARKETPLACE_REPO ? (
-              <>
-                <p>
-                  Install the plugin. It adds the server, a skill, and the /context, /save, /log,
-                  and /handoff commands.
+        <div className="flex flex-col gap-8">
+          {MARKETPLACE_REPO && (
+            <section className="flex flex-col gap-4" aria-labelledby="plugin-heading">
+              <div className="space-y-1">
+                <h2 id="plugin-heading" className="font-medium">
+                  Install the plugin <span className="text-muted-foreground">(recommended)</span>
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  One install gives you the MCP server, the skill, six commands, and a hook that
+                  tells Claude which project each repo is. You do not need to add the server
+                  separately.
                 </p>
-                <Command value={`/plugin marketplace add ${MARKETPLACE_REPO}`} />
-                <Command value={`/plugin install ${PLUGIN_NAME}@${MARKETPLACE_NAME}`} />
-                <p className="text-muted-foreground">Or add only the server:</p>
-              </>
-            ) : (
-              <p>Add the server in your terminal.</p>
-            )}
-            <Command value={`claude mcp add --transport http ${PLUGIN_NAME} ${mcpUrl}`} />
-          </Step>
-          <Step n={2}>
-            <p>
-              Run <code className="font-mono">/mcp</code> in Claude Code, pick {PLUGIN_NAME}, and
-              sign in.
-            </p>
-          </Step>
-        </ol>
+              </div>
+              <ol className="flex flex-col gap-6">
+                <Step n={1}>
+                  <p>In Claude Code, add the marketplace and install the plugin.</p>
+                  <Command value={`/plugin marketplace add ${MARKETPLACE_REPO}`} />
+                  <Command value={`/plugin install ${PLUGIN_NAME}@${MARKETPLACE_NAME}`} />
+                </Step>
+                <Step n={2}>
+                  <p>
+                    Run <code className="font-mono">/mcp</code>, pick {PLUGIN_NAME}, and sign in.
+                  </p>
+                </Step>
+              </ol>
+            </section>
+          )}
+
+          <section className="flex flex-col gap-4" aria-labelledby="manual-heading">
+            <div className="space-y-1">
+              <h2 id="manual-heading" className="font-medium">
+                {MARKETPLACE_REPO ? "Or set it up by hand" : "Set it up"}
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                {MARKETPLACE_REPO
+                  ? "Use this instead of the plugin, not as well. Adding both gives you two copies of the server."
+                  : "Add the server, then optionally the skill."}
+              </p>
+            </div>
+            <ol className="flex flex-col gap-6">
+              <Step n={1}>
+                <p>Add the MCP server from your terminal.</p>
+                <Command value={`claude mcp add --transport http ${PLUGIN_NAME} ${mcpUrl}`} />
+              </Step>
+              <Step n={2}>
+                <p>
+                  Optional: install the skill, so Claude knows when to save, share, and log without
+                  being asked.
+                </p>
+                <Command value={skillCommand} />
+              </Step>
+              <Step n={3}>
+                <p>
+                  Run <code className="font-mono">/mcp</code>, pick {PLUGIN_NAME}, and sign in.
+                </p>
+              </Step>
+            </ol>
+          </section>
+        </div>
       );
+    }
     case "claude-apps":
       return (
         <ol className="flex flex-col gap-6">

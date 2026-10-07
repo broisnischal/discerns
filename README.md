@@ -12,20 +12,23 @@ Live at **https://discerns.app**.
 
 ## Connect Claude
 
-**Claude Code**, plugin (server plus the skill that tells Claude when to use it):
+**Claude Code, with the plugin (recommended).** The plugin includes the MCP server, the skill,
+six commands, and a session hook, so there is nothing else to install:
 
 ```sh
-/plugin marketplace add <owner>/<repo>
+/plugin marketplace add broisnischal/discerns
 /plugin install discerns@discerns
 ```
 
-**Claude Code**, server only:
+**Claude Code, by hand.** Use this instead of the plugin, not as well, or you get two copies of
+the server. The skill is optional:
 
 ```sh
 claude mcp add --transport http discerns https://discerns.app/mcp
+mkdir -p ~/.claude/skills && curl -fsSL https://discerns.app/downloads/discerns-skill.zip -o /tmp/discerns-skill.zip && unzip -oq /tmp/discerns-skill.zip -d ~/.claude/skills
 ```
 
-Then run `/mcp` and sign in.
+Either way, run `/mcp` in Claude Code and sign in.
 
 **claude.ai, Desktop, mobile:** Settings → Connectors → Add custom connector → `https://discerns.app/mcp`. The skill can be uploaded separately from Settings → Capabilities → Skills using [`discerns-skill.zip`](https://discerns.app/downloads/discerns-skill.zip).
 

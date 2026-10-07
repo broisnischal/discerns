@@ -7,11 +7,22 @@ streams live logs your teammates can watch at [discerns.app](https://discerns.ap
 ## Install
 
 ```
-/plugin marketplace add broisnischal/ewiz-share
+/plugin marketplace add broisnischal/discerns
 /plugin install discerns@discerns
 ```
 
-Then run `/mcp`, pick **discerns**, and sign in. Agent access is part of discerns Pro.
+Then run `/mcp`, pick **discerns**, and sign in. The plugin includes the MCP server, so there
+is nothing else to install. Agent access is part of discerns Pro.
+
+## Without the plugin
+
+Add the server and, optionally, the skill. Use this instead of the plugin, not as well,
+or you will have two copies of the server.
+
+```
+claude mcp add --transport http discerns https://discerns.app/mcp
+mkdir -p ~/.claude/skills && curl -fsSL https://discerns.app/downloads/discerns-skill.zip -o /tmp/discerns-skill.zip && unzip -oq /tmp/discerns-skill.zip -d ~/.claude/skills
+```
 
 ## What you get
 
