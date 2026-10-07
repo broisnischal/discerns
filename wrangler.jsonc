@@ -31,15 +31,18 @@
       "ENCRYPTION_KEY",
       "GITHUB_CLIENT_ID",
       "GITHUB_CLIENT_SECRET",
-      "GOOGLE_CLIENT_ID",
-      "GOOGLE_CLIENT_SECRET",
       "DODO_PAYMENTS_API_KEY",
       "DODO_PAYMENTS_WEBHOOK_SECRET",
       "DODO_PAYMENTS_ENVIRONMENT",
       "DODO_PRO_MONTHLY_PRODUCT_ID",
       "DODO_PRO_YEARLY_PRODUCT_ID",
-      "DODO_INTRO_DISCOUNT_CODE",
+      // Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET here once Google sign-in is set up.
+      // Deploys fail while a listed secret is unset, and .dev.vars only loads listed ones.
     ],
+  },
+  "vars": {
+    // Not secret: Dodo shows the code at checkout. Empty means no first-month offer.
+    "DODO_INTRO_DISCOUNT_CODE": "",
   },
   "d1_databases": [
     {
