@@ -63,7 +63,7 @@ function ItemRow({ item }: { item: ItemSummary }) {
         )}
         <visibility.icon className="size-4" aria-hidden="true" />
         <span className="sr-only">{visibility.label}</span>
-        <span className="w-24 text-end whitespace-nowrap tabular-nums" suppressHydrationWarning>
+        <span className="text-end whitespace-nowrap tabular-nums sm:w-24" suppressHydrationWarning>
           {timeAgo(item.updatedAt)}
         </span>
       </span>

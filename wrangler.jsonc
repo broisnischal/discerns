@@ -36,7 +36,8 @@
       "DODO_PAYMENTS_ENVIRONMENT",
       "DODO_PRO_MONTHLY_PRODUCT_ID",
       "DODO_PRO_YEARLY_PRODUCT_ID",
-      // Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET here once Google sign-in is set up.
+      "GOOGLE_CLIENT_ID",
+      "GOOGLE_CLIENT_SECRET",
       // Deploys fail while a listed secret is unset, and .dev.vars only loads listed ones.
     ],
   },

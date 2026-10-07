@@ -54,13 +54,19 @@ export function LogoMark({ className }: { className?: string }) {
   );
 }
 
-export function Logo({ withName = false }: { withName?: boolean }) {
+export function Logo({
+  withName = false,
+  markClassName = "size-9",
+}: {
+  withName?: boolean;
+  markClassName?: string;
+}) {
   return (
     <Link
       to="/"
       className="inline-flex items-center gap-2.5 rounded-xl font-semibold tracking-tight focus-visible:ring-3 focus-visible:ring-ring/30 focus-visible:outline-none"
     >
-      <LogoMark className="size-9" />
+      <LogoMark className={markClassName} />
       <span className={cn(!withName && "sr-only")}>{APP_NAME}</span>
     </Link>
   );
@@ -80,7 +86,7 @@ const NAV: {
 ];
 
 const navLinkClass =
-  "flex shrink-0 items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors duration-150 hover:bg-muted/70 hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/30 focus-visible:outline-none data-[status=active]:bg-selected data-[status=active]:text-selected-foreground md:gap-3 md:text-[15px]";
+  "flex shrink-0 items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-muted-foreground transition-colors duration-150 hover:bg-muted/70 hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/30 focus-visible:outline-none data-[status=active]:bg-selected data-[status=active]:text-selected-foreground";
 
 /** The user's projects as folders under the main nav; wide screens only, the Items filter covers phones. */
 function ProjectNav() {
@@ -140,68 +146,112 @@ function ProjectNav() {
  * then a narrow nav column beside the content. The auth query is prefetched in the root
  * route, so the server renders the same variant the client hydrates.
  */
+function SkipLink() {
+  return (
+    <a
+      href="#main"
+      className="sr-only focus:not-sr-only focus:absolute focus:top-3 focus:left-3 focus:z-50 focus:rounded-xl focus:bg-card focus:px-3 focus:py-2"
+    >
+      Skip to content
+    </a>
+  );
+}
+
+/**
+ * App frame. Signed in: a sidebar with the logo on top, navigation and projects in the
+ * middle, and the account at the bottom; the page starts on the same top edge as the logo.
+ * Phones get a top bar and a scrolling nav row instead. Signed out: a slim header.
+ * The auth query is prefetched in the root route, so the server renders the right variant.
+ */
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const projectSelected = Boolean(useSearch({ strict: false }).project);
 
-  return (
-    <div className="mx-auto flex min-h-svh w-full max-w-5xl flex-col px-5 py-8 sm:px-8 md:py-14">
-      <a
-        href="#main"
-        className="sr-only focus:not-sr-only focus:absolute focus:top-3 focus:left-3 focus:z-50 focus:rounded-xl focus:bg-card focus:px-3 focus:py-2"
-      >
-        Skip to content
-      </a>
-
-      <header className="flex items-center justify-between gap-4">
-        <Logo />
-        <div className="flex items-center gap-2">
-          <ThemeToggle />
-          {user ? (
-            <UserMenu user={user} />
-          ) : (
-            <Button render={<Link to="/login" />} nativeButton={false} variant="outline">
+  if (!user) {
+    return (
+      <div className="flex min-h-svh flex-col">
+        <SkipLink />
+        <header className="mx-auto flex h-16 w-full max-w-5xl items-center justify-between gap-4 px-5 sm:px-8">
+          <Logo withName />
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <Button render={<Link to="/login" />} nativeButton={false}>
               Sign in
             </Button>
-          )}
-        </div>
-      </header>
-
-      <div className="mt-8 flex flex-1 flex-col gap-6 md:mt-10 md:grid md:grid-cols-[15rem_minmax(0,1fr)] md:items-start md:gap-10">
-        {user && (
-          <nav
-            aria-label="Main"
-            className="-mx-5 flex gap-1 overflow-x-auto px-5 sm:-mx-8 sm:px-8 md:sticky md:top-8 md:mx-0 md:flex-col md:px-0"
-          >
-            {NAV.map((item) => (
-              <Link
-                key={item.to}
-                to={item.to}
-                activeOptions={
-                  // Inside a project the project entry below is the active one, so Items
-                  // matches only when no search params are set (an exact, empty match fails).
-                  item.to === "/app/items" && projectSelected
-                    ? { exact: true, includeSearch: true }
-                    : { exact: item.to === "/app", includeSearch: false }
-                }
-                className={navLinkClass}
-              >
-                <item.icon className="size-5" aria-hidden="true" />
-                {item.label}
-              </Link>
-            ))}
-            <ProjectNav />
-          </nav>
-        )}
-        <main id="main" className={cn("min-w-0 flex-1", !user && "md:col-span-2")}>
+          </div>
+        </header>
+        <main id="main" className="mx-auto w-full max-w-4xl flex-1 px-5 pt-6 pb-16 sm:px-8">
           {children}
         </main>
       </div>
+    );
+  }
+
+  const nav = NAV.map((item) => (
+    <Link
+      key={item.to}
+      to={item.to}
+      activeOptions={
+        // Inside a project the project entry is the active one, so Items matches only
+        // when no search params are set (an exact, empty match fails).
+        item.to === "/app/items" && projectSelected
+          ? { exact: true, includeSearch: true }
+          : { exact: item.to === "/app", includeSearch: false }
+      }
+      className={navLinkClass}
+    >
+      <item.icon className="size-5" aria-hidden="true" />
+      {item.label}
+    </Link>
+  ));
+
+  return (
+    <div className="mx-auto w-full max-w-6xl md:grid md:grid-cols-[14.5rem_minmax(0,1fr)] md:gap-10 md:px-8">
+      <SkipLink />
+
+      {/* Phones: top bar, then a scrolling row of nav pills. */}
+      <div className="md:hidden">
+        <header className="flex h-16 items-center justify-between gap-3 px-5 sm:px-8">
+          <Logo withName markClassName="size-8" />
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <UserMenu user={user} compact />
+          </div>
+        </header>
+        <nav aria-label="Main" className="flex gap-1 overflow-x-auto px-5 pb-2 sm:px-8">
+          {nav}
+        </nav>
+      </div>
+
+      {/* Wider screens: a full-height sidebar. Logo, nav icons, and account share one edge. */}
+      <aside className="sticky top-0 hidden h-svh flex-col gap-6 py-8 md:flex">
+        <div className="flex h-9 items-center px-3">
+          <Logo withName markClassName="size-7" />
+        </div>
+        <nav aria-label="Main" className="flex flex-col gap-0.5">
+          {nav}
+        </nav>
+        <ProjectNav />
+        <div className="mt-auto flex items-center gap-1 border-t pt-4">
+          <UserMenu user={user} />
+          <ThemeToggle />
+        </div>
+      </aside>
+
+      <main id="main" className="min-w-0 px-5 pt-4 pb-16 sm:px-8 md:px-0 md:pt-8">
+        <div className="mx-auto w-full max-w-3xl">{children}</div>
+      </main>
     </div>
   );
 }
 
-function UserMenu({ user }: { user: { name: string; email: string; image?: string | null } }) {
+function UserMenu({
+  user,
+  compact = false,
+}: {
+  user: { name: string; email: string; image?: string | null };
+  compact?: boolean;
+}) {
   const queryClient = useQueryClient();
   const router = useRouter();
 
@@ -220,20 +270,40 @@ function UserMenu({ user }: { user: { name: string; email: string; image?: strin
     <DropdownMenu>
       <DropdownMenuTrigger
         render={
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="Account menu"
-            className="overflow-hidden rounded-[10px] p-0 hover:opacity-90"
-          />
+          compact ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Account menu"
+              className="overflow-hidden rounded-[10px] p-0 hover:opacity-90"
+            />
+          ) : (
+            <Button
+              variant="ghost"
+              aria-label="Account menu"
+              className="h-auto min-w-0 flex-1 justify-start gap-2.5 rounded-xl px-2 py-1.5"
+            />
+          )
         }
       >
         <Avatar className="size-8 rounded-[10px] after:rounded-[10px]">
           {user.image && <AvatarImage src={user.image} alt="" className="rounded-[10px]" />}
           <AvatarFallback className="rounded-[10px] text-xs">{initials(user.name)}</AvatarFallback>
         </Avatar>
+        {!compact && (
+          <span className="min-w-0 flex-1 text-start">
+            <span className="block truncate text-sm font-medium">{user.name}</span>
+            <span className="block truncate text-xs font-normal text-muted-foreground">
+              {user.email}
+            </span>
+          </span>
+        )}
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="min-w-56">
+      <DropdownMenuContent
+        align={compact ? "end" : "start"}
+        side={compact ? "bottom" : "top"}
+        className="min-w-56"
+      >
         <DropdownMenuGroup>
           <DropdownMenuLabel>
             <div className="font-medium text-foreground">{user.name}</div>

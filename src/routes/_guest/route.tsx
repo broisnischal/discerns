@@ -1,7 +1,8 @@
-import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, redirect } from "@tanstack/react-router";
 import { z } from "zod";
 
-import { LogoMark } from "#/components/app-shell.tsx";
+import { Logo } from "#/components/app-shell.tsx";
+import { ThemeToggle } from "#/components/theme-toggle.tsx";
 import { authQueryOptions } from "#/lib/auth/queries.ts";
 import { safeRedirect } from "#/lib/format.ts";
 import { APP_NAME } from "#/lib/site.ts";
@@ -30,14 +31,27 @@ export const Route = createFileRoute("/_guest")({
 
 function GuestLayout() {
   return (
-    <main className="flex min-h-svh flex-col items-center justify-center gap-8 p-6 md:p-10">
-      <div className="flex flex-col items-center gap-3">
-        <LogoMark className="size-14" />
-        <span className="font-semibold tracking-tight">{APP_NAME}</span>
-      </div>
-      <div className="w-full max-w-sm">
-        <Outlet />
-      </div>
-    </main>
+    <div className="flex min-h-svh flex-col">
+      <header className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-5 sm:px-8">
+        <Logo withName />
+        <ThemeToggle />
+      </header>
+      <main className="flex flex-1 items-center justify-center px-5 pb-16 sm:px-8">
+        <div className="w-full max-w-sm">
+          <Outlet />
+        </div>
+      </main>
+      <footer className="flex justify-center gap-6 px-5 pb-8 text-xs text-muted-foreground">
+        <span>
+          © {new Date().getFullYear()} {APP_NAME}
+        </span>
+        <Link to="/terms" className="hover:text-foreground">
+          Terms
+        </Link>
+        <Link to="/privacy" className="hover:text-foreground">
+          Privacy
+        </Link>
+      </footer>
+    </div>
   );
 }

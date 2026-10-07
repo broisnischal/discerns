@@ -12,7 +12,10 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthRouteRouteImport } from './routes/_auth/route'
 import { Route as GuestRouteRouteImport } from './routes/_guest/route'
+import { Route as LicenseRouteImport } from './routes/license'
 import { Route as McpRouteImport } from './routes/mcp'
+import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as TermsRouteImport } from './routes/terms'
 import { Route as DotwellKnownSplatRouteImport } from './routes/[.]well-known/$'
 import { Route as GuestLoginRouteImport } from './routes/_guest/login'
 import { Route as PIdRouteImport } from './routes/p/$id'
@@ -42,9 +45,24 @@ const GuestRouteRoute = GuestRouteRouteImport.update({
   id: '/_guest',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LicenseRoute = LicenseRouteImport.update({
+  id: '/license',
+  path: '/license',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const McpRoute = McpRouteImport.update({
   id: '/mcp',
   path: '/mcp',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DotwellKnownSplatRoute = DotwellKnownSplatRouteImport.update({
@@ -125,7 +143,10 @@ const AuthPIdEditRoute = AuthPIdEditRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/license': typeof LicenseRoute
   '/mcp': typeof McpRoute
+  '/privacy': typeof PrivacyRoute
+  '/terms': typeof TermsRoute
   '/.well-known/$': typeof DotwellKnownSplatRoute
   '/login': typeof GuestLoginRoute
   '/p/$id': typeof PIdRoute
@@ -144,7 +165,10 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/license': typeof LicenseRoute
   '/mcp': typeof McpRoute
+  '/privacy': typeof PrivacyRoute
+  '/terms': typeof TermsRoute
   '/.well-known/$': typeof DotwellKnownSplatRoute
   '/login': typeof GuestLoginRoute
   '/p/$id': typeof PIdRoute
@@ -166,7 +190,10 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_auth': typeof AuthRouteRouteWithChildren
   '/_guest': typeof GuestRouteRouteWithChildren
+  '/license': typeof LicenseRoute
   '/mcp': typeof McpRoute
+  '/privacy': typeof PrivacyRoute
+  '/terms': typeof TermsRoute
   '/.well-known/$': typeof DotwellKnownSplatRoute
   '/_guest/login': typeof GuestLoginRoute
   '/p/$id': typeof PIdRoute
@@ -187,7 +214,10 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/license'
     | '/mcp'
+    | '/privacy'
+    | '/terms'
     | '/.well-known/$'
     | '/login'
     | '/p/$id'
@@ -206,7 +236,10 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/license'
     | '/mcp'
+    | '/privacy'
+    | '/terms'
     | '/.well-known/$'
     | '/login'
     | '/p/$id'
@@ -227,7 +260,10 @@ export interface FileRouteTypes {
     | '/'
     | '/_auth'
     | '/_guest'
+    | '/license'
     | '/mcp'
+    | '/privacy'
+    | '/terms'
     | '/.well-known/$'
     | '/_guest/login'
     | '/p/$id'
@@ -249,7 +285,10 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthRouteRoute: typeof AuthRouteRouteWithChildren
   GuestRouteRoute: typeof GuestRouteRouteWithChildren
+  LicenseRoute: typeof LicenseRoute
   McpRoute: typeof McpRoute
+  PrivacyRoute: typeof PrivacyRoute
+  TermsRoute: typeof TermsRoute
   DotwellKnownSplatRoute: typeof DotwellKnownSplatRoute
   PIdRoute: typeof PIdRoute
   RawIdRoute: typeof RawIdRoute
@@ -279,11 +318,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GuestRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/license': {
+      id: '/license'
+      path: '/license'
+      fullPath: '/license'
+      preLoaderRoute: typeof LicenseRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/mcp': {
       id: '/mcp'
       path: '/mcp'
       fullPath: '/mcp'
       preLoaderRoute: typeof McpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/.well-known/$': {
@@ -440,7 +500,10 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRouteRoute: AuthRouteRouteWithChildren,
   GuestRouteRoute: GuestRouteRouteWithChildren,
+  LicenseRoute: LicenseRoute,
   McpRoute: McpRoute,
+  PrivacyRoute: PrivacyRoute,
+  TermsRoute: TermsRoute,
   DotwellKnownSplatRoute: DotwellKnownSplatRoute,
   PIdRoute: PIdRoute,
   RawIdRoute: RawIdRoute,

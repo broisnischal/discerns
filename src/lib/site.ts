@@ -2,6 +2,11 @@ export const APP_NAME = "discerns";
 export const APP_DESCRIPTION =
   "Save prompts, memories, snippets, and env files, share them with your team, and let Claude, Cursor, Codex, and other coding agents read and write them over MCP.";
 
+/** Where legal and support questions go. Needs a mailbox or Cloudflare Email Routing rule. */
+export const CONTACT_EMAIL = "support@discerns.app";
+/** Shown on the legal pages; bump when the terms or privacy policy change. */
+export const LEGAL_UPDATED = "October 7, 2026";
+
 export const PLUGIN_NAME = "discerns";
 export const MARKETPLACE_NAME = "discerns";
 /** GitHub `owner/repo` that hosts .claude-plugin/marketplace.json. Empty until published. */
