@@ -81,7 +81,7 @@ function subscriptionRequired(): CallToolResult {
  */
 export function createMcpServer(userId: string, plan: Plan) {
   const server = new McpServer(
-    { name: "discerns", title: APP_NAME, version: "0.2.0" },
+    { name: "discerns", title: APP_NAME, version: "0.3.0" },
     { instructions: INSTRUCTIONS },
   );
   const actor = { userId, source: "mcp" as const };
