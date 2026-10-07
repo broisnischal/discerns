@@ -32,6 +32,8 @@ export const Route = createFileRoute("/_auth/app/settings")({
   validateSearch: z.object({
     tab: z.enum(["profile", "security", "billing"]).optional().catch(undefined),
     billing: z.enum(["success"]).optional().catch(undefined),
+    /** Dodo appends the payment outcome to the return URL, e.g. status=failed. */
+    status: z.string().optional().catch(undefined),
   }),
   head: () => ({ meta: [{ title: "Settings" }] }),
   component: SettingsPage,
@@ -385,7 +387,9 @@ function BillingTab() {
     ...billingQueryOptions(),
     // After checkout the webhook may land a few seconds later; keep asking until Pro shows.
     refetchInterval: (query) =>
-      search.billing === "success" && query.state.data?.plan !== "pro" ? 2500 : false,
+      search.billing === "success" && search.status !== "failed" && query.state.data?.plan !== "pro"
+        ? 2500
+        : false,
   });
 
   const [interval, setInterval] = useState<BillingInterval>("yearly");
@@ -422,10 +426,16 @@ function BillingTab() {
 
   return (
     <div className="flex flex-col gap-6">
-      {search.billing === "success" && !isPro && (
+      {search.billing === "success" && search.status === "failed" && (
+        <p className="rounded-2xl bg-destructive/10 p-4 text-sm text-destructive" role="alert">
+          The payment didn&apos;t go through, so nothing was charged and your plan hasn&apos;t
+          changed. Try again with a different card.
+        </p>
+      )}
+      {search.billing === "success" && search.status !== "failed" && !isPro && (
         <p className="flex items-center gap-2 surface p-4 text-sm" role="status">
           <LoaderCircleIcon className="size-4 animate-spin" aria-hidden="true" />
-          Thanks! Your payment is confirmed and Pro will switch on here in a moment.
+          Confirming your payment. Pro switches on here as soon as it clears.
         </p>
       )}
 

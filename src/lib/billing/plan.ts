@@ -35,28 +35,38 @@ export const YEARLY_SAVINGS_PERCENT = Math.floor(
   (1 - PRO_PRICES.yearly.amount / (12 * PRO_PRICES.monthly.amount)) * 100,
 );
 
-const PAID_STATUSES = new Set([
-  "active",
-  "renewed",
-  "on_hold",
-  "plan_changed",
-  "updated",
-  "unpaused",
-]);
+/** Pro keeps working this long past a renewal date whose renewal never arrived. */
+const RENEWAL_GRACE_MS = 3 * 24 * 60 * 60 * 1000;
 
-/** A subscription keeps Pro while paid, and until the period ends after a cancellation. */
+/**
+ * Plan from the stored Dodo subscription. Only Dodo's `active` status means it is paid;
+ * pending, failed, on hold, past due, paused, cancelled, and expired are all Free.
+ */
 export function planFor(
   subscription: { status: string; currentPeriodEnd: Date | null } | null | undefined,
   now = Date.now(),
 ): Plan {
-  if (!subscription) return "free";
-  if (PAID_STATUSES.has(subscription.status)) return "pro";
-  if (
-    subscription.status === "cancelled" &&
-    subscription.currentPeriodEnd &&
-    subscription.currentPeriodEnd.getTime() > now
-  ) {
-    return "pro";
-  }
-  return "free";
+  if (subscription?.status !== "active") return "free";
+  const end = subscription.currentPeriodEnd?.getTime();
+  // A missed renewal or cancellation webhook must not leave Pro on indefinitely.
+  if (end !== undefined && end + RENEWAL_GRACE_MS < now) return "free";
+  return "pro";
+}
+
+/**
+ * Whether an incoming subscription should replace the stored one. A different subscription
+ * only takes over when it is active or the stored one no longer is, so a failed second
+ * checkout cannot end a plan that is still being paid for.
+ */
+export function shouldReplaceSubscription(
+  stored: { dodoSubscriptionId: string; status: string } | null | undefined,
+  incoming: { subscriptionId: string; status: string },
+) {
+  if (!stored || stored.dodoSubscriptionId === incoming.subscriptionId) return true;
+  return incoming.status === "active" || stored.status !== "active";
+}
+
+/** The first-month price is for accounts that never paid; a failed attempt does not count. */
+export function introEligible(stored: { status: string } | null | undefined) {
+  return !stored || stored.status === "failed" || stored.status === "pending";
 }

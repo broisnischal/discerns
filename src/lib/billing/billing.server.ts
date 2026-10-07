@@ -1,5 +1,6 @@
 import "@tanstack/react-start/server-only";
 import type { Subscription } from "@dodopayments/core";
+import DodoPayments from "dodopayments";
 import { eq, sql } from "drizzle-orm";
 import { createError } from "evlog";
 
@@ -7,7 +8,16 @@ import { db } from "#/lib/db/index.ts";
 import { item, project, subscription, user } from "#/lib/db/schema/index.ts";
 import { serverEnv } from "#/lib/env.server.ts";
 
-import { INTRO_PRICE, LIMITS, PRO_PRICES, planFor, type BillingInterval, type Plan } from "./plan";
+import {
+  INTRO_PRICE,
+  introEligible,
+  LIMITS,
+  PRO_PRICES,
+  planFor,
+  shouldReplaceSubscription,
+  type BillingInterval,
+  type Plan,
+} from "./plan";
 
 /** Payments are optional in local dev; the UI hides upgrade buttons when this is false. */
 export function billingEnabled() {
@@ -49,7 +59,7 @@ export async function getBilling(userId: string) {
     limits: LIMITS[plan],
     usage,
     /** Shown only to people who never subscribed; the row survives cancellation. */
-    introOffer: introCode && !row && productIds.monthly ? INTRO_PRICE : null,
+    introOffer: introCode && introEligible(row) && productIds.monthly ? INTRO_PRICE : null,
     /** Prices the user can pick at checkout; yearly appears once its product is configured. */
     intervals: (Object.keys(productIds) as BillingInterval[]).filter((i) => productIds[i]),
     subscription: row
@@ -93,19 +103,39 @@ export const assertCanCreateProject = (userId: string) => assertUnderLimit(userI
 export async function checkoutDiscounts(userId: string, slug: string) {
   const code = serverEnv().DODO_INTRO_DISCOUNT_CODE;
   if (!code || slug !== PRO_PRICES.monthly.slug) return [];
-  const before = await db
-    .select({ userId: subscription.userId })
+  const stored = await db
+    .select({ status: subscription.status })
     .from(subscription)
     .where(eq(subscription.userId, userId))
     .get();
-  return before ? [] : [code];
+  return introEligible(stored) ? [code] : [];
+}
+
+function proProductIds() {
+  const env = serverEnv();
+  return [env.DODO_PRO_MONTHLY_PRODUCT_ID, env.DODO_PRO_YEARLY_PRODUCT_ID].filter(Boolean);
+}
+
+function dodoClient() {
+  const env = serverEnv();
+  return new DodoPayments({
+    bearerToken: env.DODO_PAYMENTS_API_KEY,
+    environment: env.DODO_PAYMENTS_ENVIRONMENT === "live_mode" ? "live_mode" : "test_mode",
+  });
 }
 
 /**
- * Mirrors a Dodo subscription webhook into the subscription table. The customer is matched
- * by the id Better Auth stored at sign-up, falling back to the userId we put in metadata.
+ * Mirrors a Dodo subscription webhook into the subscription table.
+ *
+ * The event name says nothing about payment (Dodo sends `subscription.updated` when a
+ * checkout is created and when it fails), and deliveries can arrive out of order, so the
+ * subscription's current state is read back from Dodo and its `status` is what's stored.
  */
-export async function applySubscriptionEvent(event: string, data: Subscription) {
+export async function applySubscriptionEvent(event: string, payload: Subscription) {
+  // The Dodo account also sells other products; their subscriptions are not ours to mirror.
+  if (!proProductIds().includes(payload.product_id)) return;
+
+  const data = await dodoClient().subscriptions.retrieve(payload.subscription_id);
   const customerId = data.customer.customer_id;
   const metadataUserId =
     typeof data.metadata?.userId === "string" ? data.metadata.userId : undefined;
@@ -139,10 +169,24 @@ export async function applySubscriptionEvent(event: string, data: Subscription) 
     await db.update(user).set({ dodoCustomerId: customerId }).where(eq(user.id, owner.id));
   }
 
+  const stored = await db
+    .select({ dodoSubscriptionId: subscription.dodoSubscriptionId, status: subscription.status })
+    .from(subscription)
+    .where(eq(subscription.userId, owner.id))
+    .get();
+  if (
+    !shouldReplaceSubscription(stored, {
+      subscriptionId: data.subscription_id,
+      status: data.status,
+    })
+  ) {
+    return;
+  }
+
   const values = {
     dodoSubscriptionId: data.subscription_id,
     productId: data.product_id,
-    status: event,
+    status: data.status,
     currentPeriodEnd: data.next_billing_date ? new Date(data.next_billing_date) : null,
     cancelAtPeriodEnd: Boolean(data.cancel_at_next_billing_date),
   };
